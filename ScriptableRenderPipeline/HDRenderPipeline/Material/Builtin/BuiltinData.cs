@@ -1,4 +1,4 @@
-using UnityEngine;
+﻿using UnityEngine;
 
 //-----------------------------------------------------------------------------
 // structure definition
@@ -75,6 +75,16 @@ namespace UnityEngine.Experimental.Rendering.HDPipeline
         }
 
         public static RenderTextureReadWrite GetDistortionBufferReadWrite()
+        {
+            return RenderTextureReadWrite.Linear;
+        }
+
+        public static RenderTextureFormat GetGaussianPyramidBufferFormat()
+        {
+            return RenderTextureFormat.ARGBHalf;
+        }
+
+        public static RenderTextureReadWrite GetGaussianPyramidBufferReadWrite()
         {
             return RenderTextureReadWrite.Linear;
         }

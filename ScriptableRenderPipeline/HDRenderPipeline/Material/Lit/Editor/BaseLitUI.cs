@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using UnityEngine;
 using UnityEngine.Rendering;
 using UnityEngine.Experimental.Rendering.HDPipeline;
@@ -325,6 +325,9 @@ namespace UnityEditor.Experimental.Rendering.HDPipeline
 
             bool windEnabled = material.GetFloat(kWindEnabled) > 0.0f;
             SetKeyword(material, "_VERTEX_WIND", windEnabled);
+
+            bool roughRefractionEnabled = material.GetFloat(kRoughRefractionEnable) > 0.0f;
+            SetKeyword(material, "_ROUGH_REFRACTION", roughRefractionEnabled);
         }
 
         static public void SetupBaseLitMaterialPass(Material material)

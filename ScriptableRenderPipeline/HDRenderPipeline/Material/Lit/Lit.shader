@@ -1,4 +1,4 @@
-Shader "HDRenderPipeline/Lit"
+﻿Shader "HDRenderPipeline/Lit"
 {
     Properties
     {
@@ -77,6 +77,8 @@ Shader "HDRenderPipeline/Lit"
         [ToggleOff]  _AlphaCutoffEnable("Alpha Cutoff Enable", Float) = 0.0
         _AlphaCutoff("Alpha Cutoff", Range(0.0, 1.0)) = 0.5
 
+        [ToggleOff]  _RoughRefractionEnable("Rough Refraction Enable", Float) = 0.0
+
         // Stencil state
         [HideInInspector] _StencilRef("_StencilRef", Int) = 2 // StencilLightingUsage.RegularLighting  (fixed at compile time)
 
@@ -130,6 +132,7 @@ Shader "HDRenderPipeline/Lit"
     #pragma shader_feature _DEPTHOFFSET_ON
     #pragma shader_feature _DOUBLESIDED_ON
     #pragma shader_feature _PER_PIXEL_DISPLACEMENT
+    #pragma shader_feature _ROUGH_REFRACTION
 
     #pragma shader_feature _ _MAPPING_PLANAR _MAPPING_TRIPLANAR
     #pragma shader_feature _NORMALMAP_TANGENT_SPACE

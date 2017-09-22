@@ -1,4 +1,4 @@
-namespace UnityEngine.Experimental.Rendering.HDPipeline
+﻿namespace UnityEngine.Experimental.Rendering.HDPipeline
 {
     static class HDShaderPassNames
     {
@@ -176,6 +176,7 @@ namespace UnityEngine.Experimental.Rendering.HDPipeline
 
         internal static readonly int _VelocityTexture = Shader.PropertyToID("_VelocityTexture");
         internal static readonly int _DistortionTexture = Shader.PropertyToID("_DistortionTexture");
+        internal static readonly int _GaussianPyramidTexture = Shader.PropertyToID("_GaussianPyramidTexture");
         internal static readonly int _DebugFullScreenTexture = Shader.PropertyToID("_DebugFullScreenTexture");
 
         internal static readonly int _WorldScales = Shader.PropertyToID("_WorldScales");

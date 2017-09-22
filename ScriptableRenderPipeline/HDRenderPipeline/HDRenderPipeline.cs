@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using UnityEngine.Rendering;
 using System;
 using System.Linq;
@@ -282,6 +282,22 @@ namespace UnityEngine.Experimental.Rendering.HDPipeline
 
     public partial class HDRenderPipeline : RenderPipeline
     {
+        static readonly int[] k_GaussianPyramidMipID =
+        {
+            Shader.PropertyToID("_GaussianMip0"),
+            Shader.PropertyToID("_GaussianMip1"),
+            Shader.PropertyToID("_GaussianMip2"),
+            Shader.PropertyToID("_GaussianMip3"),
+            Shader.PropertyToID("_GaussianMip4"),
+            Shader.PropertyToID("_GaussianMip5"),
+            Shader.PropertyToID("_GaussianMip6"),
+            Shader.PropertyToID("_GaussianMip7"),
+            Shader.PropertyToID("_GaussianMip8"),
+            Shader.PropertyToID("_GaussianMip9"),
+            Shader.PropertyToID("_GaussianMip10"),
+            Shader.PropertyToID("_GaussianMip11")
+        };
+
         readonly HDRenderPipelineAsset m_Asset;
 
         readonly RenderPipelineMaterial m_DeferredMaterial;
@@ -301,6 +317,9 @@ namespace UnityEngine.Experimental.Rendering.HDPipeline
         Material m_SssHorizontalFilterAndCombinePass;
         // <<< Old SSS Model
 
+        ComputeShader m_GaussianPyramidCS { get { return m_Asset.renderPipelineResources.gaussianPyramidCS; } }
+        int m_GaussianPyramidKernel;
+
         Material m_CameraMotionVectorsMaterial;
 
         // Debug material
@@ -319,6 +338,7 @@ namespace UnityEngine.Experimental.Rendering.HDPipeline
         // <<< Old SSS Model
         readonly int m_VelocityBuffer;
         readonly int m_DistortionBuffer;
+        readonly int m_GaussianPyramidBuffer;
 
         readonly int m_DeferredShadowBuffer;
 
@@ -330,6 +350,8 @@ namespace UnityEngine.Experimental.Rendering.HDPipeline
         // <<< Old SSS Model
         readonly RenderTargetIdentifier m_VelocityBufferRT;
         readonly RenderTargetIdentifier m_DistortionBufferRT;
+        readonly RenderTargetIdentifier m_GaussianPyramidBufferRT;
+        RenderTextureDescriptor m_GaussianPyramidBufferDesc;
 
         readonly RenderTargetIdentifier m_DeferredShadowBufferRT;
 
@@ -452,6 +474,7 @@ namespace UnityEngine.Experimental.Rendering.HDPipeline
             m_CameraFilteringBufferRT          = new RenderTargetIdentifier(m_CameraFilteringBuffer);
 
             CreateSssMaterials(sssSettings.useDisneySSS);
+            m_GaussianPyramidKernel = m_GaussianPyramidCS.FindKernel("KMain");
 
             m_CopyStencilForSplitLighting   = Utilities.CreateEngineMaterial("Hidden/HDRenderPipeline/CopyStencilBuffer");
             m_CopyStencilForSplitLighting.EnableKeyword("EXPORT_HTILE");
@@ -485,6 +508,15 @@ namespace UnityEngine.Experimental.Rendering.HDPipeline
 
             m_DistortionBuffer = HDShaderIDs._DistortionTexture;
             m_DistortionBufferRT = new RenderTargetIdentifier(m_DistortionBuffer);
+
+            m_GaussianPyramidBuffer = HDShaderIDs._GaussianPyramidTexture;
+            m_GaussianPyramidBufferRT = new RenderTargetIdentifier(m_GaussianPyramidBuffer);
+            m_GaussianPyramidBufferDesc = new RenderTextureDescriptor(2, 2, RenderTextureFormat.ARGBHalf, 0)
+            {
+                useMipMap = true,
+                autoGenerateMips = false,
+                colorFormat = RenderTextureFormat.ARGBHalf
+            };
 
             m_DeferredShadowBuffer = HDShaderIDs._DeferredShadowTexture;
             m_DeferredShadowBufferRT = new RenderTargetIdentifier(m_DeferredShadowBuffer);
@@ -957,6 +989,8 @@ namespace UnityEngine.Experimental.Rendering.HDPipeline
 
                 RenderSky(hdCamera, cmd);
 
+                RenderGaussianPyramid(camera, cmd);
+
                 // Render all type of transparent forward (unlit, lit, complex (hair...)) to keep the sorting between transparent objects.
                 RenderForward(m_CullResults, camera, renderContext, cmd, false);
 #if UNITY_EDITOR
@@ -1347,6 +1381,45 @@ namespace UnityEngine.Experimental.Rendering.HDPipeline
             }
         }
 
+        void RenderGaussianPyramid(Camera camera, CommandBuffer cmd)
+        {
+            if (!m_CurrentDebugDisplaySettings.renderingDebugSettings.enableGaussianPyramid)
+                return;
+
+            using (new Utilities.ProfilingSample("Gaussian Pyramid", cmd))
+            {
+                int w = camera.pixelWidth;
+                int h = camera.pixelHeight;
+                int size = Mathf.ClosestPowerOfTwo(Mathf.Min(w, h));
+
+                // The gaussian pyramid compute works in blocks of 8x8 so make sure the last lod has a
+                // minimum size of 8x8
+                int lodCount = Mathf.FloorToInt(Mathf.Log(size, 2f) - 3f);
+                lodCount = Mathf.Min(lodCount, k_GaussianPyramidMipID.Length);
+
+                cmd.Blit(m_CameraColorBufferRT, m_GaussianPyramidBuffer);
+
+                var last = m_GaussianPyramidBuffer;
+
+                for (int i = 0; i < lodCount; i++)
+                {
+                    size >>= 1;
+
+                    cmd.GetTemporaryRT(k_GaussianPyramidMipID[i], size, size, 0, FilterMode.Bilinear, Builtin.GetGaussianPyramidBufferFormat(), Builtin.GetGaussianPyramidBufferReadWrite(), 1, true);
+                    cmd.SetComputeTextureParam(m_GaussianPyramidCS, m_GaussianPyramidKernel, "_Source", last);
+                    cmd.SetComputeTextureParam(m_GaussianPyramidCS, m_GaussianPyramidKernel, "_Result", k_GaussianPyramidMipID[i]);
+                    cmd.SetComputeVectorParam(m_GaussianPyramidCS, "_Size", new Vector4(size, size, 1f / size, 1f / size));
+                    cmd.DispatchCompute(m_GaussianPyramidCS, m_GaussianPyramidKernel, size / 8, size / 8, 1);
+                    cmd.CopyTexture(k_GaussianPyramidMipID[i], 0, 0, m_GaussianPyramidBufferRT, 0, i + 1);
+
+                    last = k_GaussianPyramidMipID[i];
+                }
+
+                for (int i = 0; i < lodCount; i++)
+                    cmd.ReleaseTemporaryRT(k_GaussianPyramidMipID[i]);
+            }
+        }
+
         void RenderDistortion(CullResults cullResults, Camera camera, ScriptableRenderContext renderContext, CommandBuffer cmd)
         {
             if (!m_CurrentDebugDisplaySettings.renderingDebugSettings.enableDistortion)
@@ -1484,12 +1557,25 @@ namespace UnityEngine.Experimental.Rendering.HDPipeline
                     cmd.GetTemporaryRT(m_CameraSssDiffuseLightingBuffer, w, h, 0, FilterMode.Point, RenderTextureFormat.RGB111110Float, RenderTextureReadWrite.Linear, 1, true); // Enable UAV
                     cmd.GetTemporaryRT(m_CameraFilteringBuffer,          w, h, 0, FilterMode.Point, RenderTextureFormat.RGB111110Float, RenderTextureReadWrite.Linear, 1, true); // Enable UAV
 
+                    // Gaussian pyramid
+                    int s = Mathf.ClosestPowerOfTwo(Mathf.Min(w, h));
+                    m_GaussianPyramidBufferDesc.width = s;
+                    m_GaussianPyramidBufferDesc.height = s;
+                    cmd.GetTemporaryRT(m_GaussianPyramidBuffer, m_GaussianPyramidBufferDesc, FilterMode.Trilinear);
+                    // End
+
                     if (!m_Asset.renderingSettings.ShouldUseForwardRenderingOnly())
                     {
                         m_gbufferManager.InitGBuffers(w, h, cmd);
                     }
 
                     Utilities.SetRenderTarget(cmd, m_CameraColorBufferRT, m_CameraDepthStencilBufferRT, ClearFlag.ClearDepth);
+                }
+
+                // Clear the gaussian pyramid target
+                using (new Utilities.ProfilingSample("Clear gaussian pyramid target", cmd))
+                {
+                    Utilities.SetRenderTarget(cmd, m_CameraSssDiffuseLightingBufferRT, ClearFlag.ClearColor, Color.black);
                 }
 
                 // Clear the diffuse SSS lighting target

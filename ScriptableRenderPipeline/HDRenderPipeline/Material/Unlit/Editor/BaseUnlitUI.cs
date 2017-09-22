@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using UnityEngine;
 using UnityEngine.Rendering;
 
@@ -25,6 +25,8 @@ namespace UnityEditor.Experimental.Rendering.HDPipeline
             public static GUIContent distortionEnableText = new GUIContent("Distortion", "Enable distortion on this shader");
             public static GUIContent distortionOnlyText = new GUIContent("Distortion Only", "This shader will only be use to render distortion");
             public static GUIContent distortionDepthTestText = new GUIContent("Distortion Depth Test", "Enable the depth test for distortion");
+
+            public static GUIContent roughRefractionEnableText = new GUIContent("Rough Refraction", "Enable rough refraction on this shader");
 
             public static string advancedText = "Advanced Options";
         }
@@ -63,6 +65,8 @@ namespace UnityEditor.Experimental.Rendering.HDPipeline
         protected const string kDistortionOnly = "_DistortionOnly";
         protected MaterialProperty distortionDepthTest = null;
         protected const string kDistortionDepthTest = "_DistortionDepthTest";
+        protected MaterialProperty roughRefractionEnable = null;
+        protected const string kRoughRefractionEnable = "_RoughRefractionEnable";
 
         // See comment in LitProperties.hlsl
         const string kEmissionColor = "_EmissionColor";
@@ -86,6 +90,7 @@ namespace UnityEditor.Experimental.Rendering.HDPipeline
             distortionEnable = FindProperty(kDistortionEnable, props, false);
             distortionOnly = FindProperty(kDistortionOnly, props, false);
             distortionDepthTest = FindProperty(kDistortionDepthTest, props, false);
+            roughRefractionEnable = FindProperty(kRoughRefractionEnable, props, false);
         }
 
         void SurfaceTypePopup()
@@ -141,6 +146,9 @@ namespace UnityEditor.Experimental.Rendering.HDPipeline
                         m_MaterialEditor.ShaderProperty(distortionDepthTest, StylesBaseUnlit.distortionDepthTestText);
                     }
                 }
+
+                if (roughRefractionEnable != null)
+                    m_MaterialEditor.ShaderProperty(roughRefractionEnable, StylesBaseUnlit.roughRefractionEnableText);
             }
             m_MaterialEditor.ShaderProperty(alphaCutoffEnable, StylesBaseUnlit.alphaCutoffEnableText);
             if (alphaCutoffEnable.floatValue == 1.0f)
