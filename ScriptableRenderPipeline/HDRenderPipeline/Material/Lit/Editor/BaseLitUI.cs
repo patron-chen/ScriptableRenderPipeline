@@ -327,7 +327,7 @@ namespace UnityEditor.Experimental.Rendering.HDPipeline
             SetKeyword(material, "_VERTEX_WIND", windEnabled);
 
             bool roughRefractionEnabled = material.GetFloat(kRoughRefractionEnable) > 0.0f;
-            SetKeyword(material, "_ROUGH_REFRACTION", roughRefractionEnabled);
+            SetKeyword(material, "_ROUGH_REFRACTION_ON", roughRefractionEnabled);
         }
 
         static public void SetupBaseLitMaterialPass(Material material)

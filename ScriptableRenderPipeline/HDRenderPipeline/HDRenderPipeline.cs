@@ -1415,6 +1415,9 @@ namespace UnityEngine.Experimental.Rendering.HDPipeline
                     last = k_GaussianPyramidMipID[i];
                 }
 
+                cmd.SetGlobalTexture(HDShaderIDs._GaussianPyramidTexture, m_GaussianPyramidBuffer);
+                cmd.SetGlobalVector(HDShaderIDs._GaussianPyramidMipSize, new Vector4(size, size, lodCount, 0));
+
                 for (int i = 0; i < lodCount; i++)
                     cmd.ReleaseTemporaryRT(k_GaussianPyramidMipID[i]);
             }
