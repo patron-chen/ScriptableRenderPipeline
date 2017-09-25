@@ -78,6 +78,8 @@
         _AlphaCutoff("Alpha Cutoff", Range(0.0, 1.0)) = 0.5
 
         [ToggleOff]  _RoughRefractionEnable("Rough Refraction Enable", Float) = 0.0
+        _IOR("Indice Of Refraction", Range(1.0, 3.0) = 1.0
+        _RefractionAbsorption("Refraction Absorption", Color) = (0.0, 0.0, 0.0)
 
         // Stencil state
         [HideInInspector] _StencilRef("_StencilRef", Int) = 2 // StencilLightingUsage.RegularLighting  (fixed at compile time)

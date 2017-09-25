@@ -1,4 +1,4 @@
-using UnityEngine.Rendering;
+﻿using UnityEngine.Rendering;
 
 namespace UnityEngine.Experimental.Rendering.HDPipeline
 {
@@ -90,6 +90,15 @@ namespace UnityEngine.Experimental.Rendering.HDPipeline
             public float coatCoverage;
             [SurfaceDataAttributes("Coat IOR")]
             public float coatIOR; // Value is [0..1] for artists but the UI will display the value between [1..2]
+
+            // Rough Refraction
+            [SurfaceDataAttributes("Enable Rough Refraction")]
+            bool enableRoughRefraction;
+            [SurfaceDataAttributes("Indice of refraction")]
+            float ior;
+            // Reuse thickness from SSS
+            [SurfaceDataAttributes("Refraction absorption")]
+            Vector3 refractionAbsorption;
         };
 
         //-----------------------------------------------------------------------------
@@ -148,6 +157,12 @@ namespace UnityEngine.Experimental.Rendering.HDPipeline
             public Vector3 coatNormalWS;
             public float coatCoverage;
             public float coatIOR; // CoatIOR is in range[1..2] it is surfaceData + 1
+
+            // Rough Refraction
+            bool enableRoughRefraction;
+            float IOR;
+            // Reuse thickness from SSS
+            Vector3 refractionAbsorption;
         };
 
         //-----------------------------------------------------------------------------

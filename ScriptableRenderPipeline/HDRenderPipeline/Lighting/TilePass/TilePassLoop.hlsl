@@ -1,4 +1,4 @@
-//-----------------------------------------------------------------------------
+﻿//-----------------------------------------------------------------------------
 // LightLoop
 // ----------------------------------------------------------------------------
 
@@ -291,10 +291,17 @@ void LightLoop( float3 V, PositionInputs posInput, PreLightData preLightData, BS
         #endif
     }
 
+    float  totalIblWeight = 0.0; // Max: 1
+
+    if (featureFlags & LIGHTFEATUREFLAGS_SSL)
+    {
+        // SSR and rough refraction
+        float2 weight = float2(0.0, 0.0);
+        EvaluateBSDF_SSL(bsdfData, accLighting.envDiffuseLighting, accLighting.envSpecularLighting, weight);
+    }
+
     if (featureFlags & LIGHTFEATUREFLAGS_ENV || featureFlags & LIGHTFEATUREFLAGS_SKY)
     {
-        float  totalIblWeight      = 0.0; // Max: 1
-
         // Reflection probes are sorted by volume (in the increasing order).
         if (featureFlags & LIGHTFEATUREFLAGS_ENV)
         {

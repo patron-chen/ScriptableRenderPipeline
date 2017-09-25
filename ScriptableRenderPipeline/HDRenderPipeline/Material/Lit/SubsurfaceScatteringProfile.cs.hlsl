@@ -1,5 +1,5 @@
 //
-// This file was automatically generated from Assets/ScriptableRenderPipeline/HDRenderPipeline/Material/Lit/SubsurfaceScatteringProfile.cs.  Please don't edit by hand.
+// This file was automatically generated from Assets/ScriptableRenderLoop/ScriptableRenderPipeline/HDRenderPipeline/Material/Lit/SubsurfaceScatteringProfile.cs.  Please don't edit by hand.
 //
 
 #ifndef SUBSURFACESCATTERINGPROFILE_CS_HLSL

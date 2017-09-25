@@ -1,4 +1,4 @@
-void ADD_IDX(ComputeLayerTexCoord)( float2 texCoord0, float2 texCoord1, float2 texCoord2, float2 texCoord3, float4 uvMappingMask, float4 uvMappingMaskDetail,
+﻿void ADD_IDX(ComputeLayerTexCoord)( float2 texCoord0, float2 texCoord1, float2 texCoord2, float2 texCoord3, float4 uvMappingMask, float4 uvMappingMaskDetail,
                                     float3 positionWS, int mappingType, float worldScale, inout LayerTexCoord layerTexCoord, float additionalTiling = 1.0)
 {
     // Handle uv0, uv1, uv2, uv3 based on _UVMappingMask weight (exclusif 0..1)
@@ -271,6 +271,13 @@ float ADD_IDX(GetSurfaceData)(FragInputs input, LayerTexCoord layerTexCoord, out
     surfaceData.coatCoverage    = _CoatCoverage;
     surfaceData.coatIOR         = _CoatIOR;
 
+#ifdef _ROUGH_REFRACTION_ON
+    surfaceData.enableRoughRefraction = true;
+    surfaceData.ior = _IOR;
+    surfaceData.refractionAbsorption = _RefractionAbsorption;
+    // Thickness already defined
+#endif
+
 #else // #if !defined(LAYERED_LIT_SHADER)
 
     // Mandatory to setup value to keep compiler quiet
@@ -289,6 +296,9 @@ float ADD_IDX(GetSurfaceData)(FragInputs input, LayerTexCoord layerTexCoord, out
     surfaceData.coatNormalWS = float3(0.0, 0.0, 0.0);
     surfaceData.coatCoverage = 0.0f;
     surfaceData.coatIOR = 0.5;
+    surfaceData.enableRoughRefraction = false;
+    surfaceData.ior = 1.0;
+    surfaceData.refractionAbsorption = float3(0.0, 0.0, 0.0);
 
 #endif // #if !defined(LAYERED_LIT_SHADER)
 

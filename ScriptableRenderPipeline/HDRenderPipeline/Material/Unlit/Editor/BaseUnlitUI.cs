@@ -26,7 +26,10 @@ namespace UnityEditor.Experimental.Rendering.HDPipeline
             public static GUIContent distortionOnlyText = new GUIContent("Distortion Only", "This shader will only be use to render distortion");
             public static GUIContent distortionDepthTestText = new GUIContent("Distortion Depth Test", "Enable the depth test for distortion");
 
-            public static GUIContent roughRefractionEnableText = new GUIContent("Rough Refraction", "Enable rough refraction on this shader");
+            public static GUIContent roughRefractionEnableText = new GUIContent("Rough Refraction", "Enable rough refraction on this shader"); 
+            public static GUIContent roughRefactionAbsorptionText = new GUIContent("Rough Refraction Absorption", "Absorption for refraction (RGB)");
+            public static GUIContent roughRefractionThicknessText = new GUIContent("Rough Refraction Thickness", "Thickness for rough refraction");
+            public static GUIContent roughRefractionIORText = new GUIContent("Indice of refraction", "Indice of refraction");
 
             public static string advancedText = "Advanced Options";
         }
@@ -67,6 +70,12 @@ namespace UnityEditor.Experimental.Rendering.HDPipeline
         protected const string kDistortionDepthTest = "_DistortionDepthTest";
         protected MaterialProperty roughRefractionEnable = null;
         protected const string kRoughRefractionEnable = "_RoughRefractionEnable";
+        protected MaterialProperty ior = null;
+        protected const string kIOR = "_IOR"; 
+        protected MaterialProperty refractionAbsorption = null;
+        protected const string kRefractionAbsorption = "_RefractionAbsorption";
+        protected MaterialProperty refractionThickness = null;
+        protected const string kRoughRefractionThickness = "_Thickness"; // Same as SSS thickness
 
         // See comment in LitProperties.hlsl
         const string kEmissionColor = "_EmissionColor";
@@ -91,6 +100,9 @@ namespace UnityEditor.Experimental.Rendering.HDPipeline
             distortionOnly = FindProperty(kDistortionOnly, props, false);
             distortionDepthTest = FindProperty(kDistortionDepthTest, props, false);
             roughRefractionEnable = FindProperty(kRoughRefractionEnable, props, false);
+            refractionAbsorption = FindProperty(kRefractionAbsorption, props, false);
+            ior = FindProperty(kIOR, props, false);
+            refractionThickness = FindProperty(kRoughRefractionThickness, props, false);
         }
 
         void SurfaceTypePopup()
@@ -148,7 +160,15 @@ namespace UnityEditor.Experimental.Rendering.HDPipeline
                 }
 
                 if (roughRefractionEnable != null)
+                {
                     m_MaterialEditor.ShaderProperty(roughRefractionEnable, StylesBaseUnlit.roughRefractionEnableText);
+                    if (roughRefractionEnable.floatValue == 1.0f)
+                    {
+                        m_MaterialEditor.ShaderProperty(refractionAbsorption, StylesBaseUnlit.roughRefactionAbsorptionText);
+                        m_MaterialEditor.ShaderProperty(ior, StylesBaseUnlit.roughRefractionIORText);
+                        m_MaterialEditor.ShaderProperty(refractionThickness, StylesBaseUnlit.roughRefractionThicknessText);
+                    }
+                }
             }
             m_MaterialEditor.ShaderProperty(alphaCutoffEnable, StylesBaseUnlit.alphaCutoffEnableText);
             if (alphaCutoffEnable.floatValue == 1.0f)

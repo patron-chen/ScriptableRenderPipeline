@@ -1,4 +1,4 @@
-//-----------------------------------------------------------------------------
+﻿//-----------------------------------------------------------------------------
 // SurfaceData and BSDFData
 //-----------------------------------------------------------------------------
 
@@ -1461,6 +1461,15 @@ void EvaluateBSDF_Area(LightLoopContext lightLoopContext,
     {
         EvaluateBSDF_Rect(lightLoopContext, V, posInput, preLightData, lightData, bsdfData, diffuseLighting, specularLighting);
     }
+}
+
+//-----------------------------------------------------------------------------
+// EvaluateBSDF_SSL
+// ----------------------------------------------------------------------------
+
+void EvaluateBSDF_SSL(  BSDFData bsdfData, out float3 diffuseLighting, out float3 specularLighting, out float2 weight)
+{
+
 }
 
 //-----------------------------------------------------------------------------

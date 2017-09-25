@@ -1,4 +1,4 @@
-// ===========================================================================
+﻿// ===========================================================================
 //                              WARNING:
 // On PS4, texture/sampler declarations need to be outside of CBuffers
 // Otherwise those parameters are not bound correctly at runtime.
@@ -96,6 +96,9 @@ float _EmissiveIntensity;
 float _AlbedoAffectEmissive;
 
 float _EnableSpecularOcclusion;
+
+float3 _RefractionAbsorption;
+float _IOR;
 
 // Caution: C# code in BaseLitUI.cs call LightmapEmissionFlagsProperty() which assume that there is an existing "_EmissionColor"
 // value that exist to identify if the GI emission need to be enabled.
