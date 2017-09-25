@@ -27,7 +27,8 @@ namespace UnityEditor.Experimental.Rendering.HDPipeline
             public static GUIContent distortionDepthTestText = new GUIContent("Distortion Depth Test", "Enable the depth test for distortion");
 
             public static GUIContent roughRefractionEnableText = new GUIContent("Rough Refraction", "Enable rough refraction on this shader"); 
-            public static GUIContent roughRefactionAbsorptionText = new GUIContent("Rough Refraction Absorption", "Absorption for refraction (RGB)");
+            public static GUIContent transmittanceColorText = new GUIContent("Transmittance Color", "Absorption color (RGB)");
+            public static GUIContent atDistanceText = new GUIContent("Transmittance Absorption Distance", "Absorption distance reference");
             public static GUIContent roughRefractionThicknessText = new GUIContent("Rough Refraction Thickness", "Thickness for rough refraction");
             public static GUIContent roughRefractionIORText = new GUIContent("Indice of refraction", "Indice of refraction");
 
@@ -71,9 +72,11 @@ namespace UnityEditor.Experimental.Rendering.HDPipeline
         protected MaterialProperty roughRefractionEnable = null;
         protected const string kRoughRefractionEnable = "_RoughRefractionEnable";
         protected MaterialProperty ior = null;
-        protected const string kIOR = "_IOR"; 
-        protected MaterialProperty refractionAbsorption = null;
-        protected const string kRefractionAbsorption = "_RefractionAbsorption";
+        protected const string kIOR = "_IOR";
+        protected MaterialProperty transmittanceColor = null;
+        protected const string kTransmittanceColor = "_TransmittanceColor";
+        protected MaterialProperty atDistance = null;
+        protected const string kATDistance = "_ATDistance";
         protected MaterialProperty refractionThickness = null;
         protected const string kRoughRefractionThickness = "_Thickness"; // Same as SSS thickness
 
@@ -100,7 +103,8 @@ namespace UnityEditor.Experimental.Rendering.HDPipeline
             distortionOnly = FindProperty(kDistortionOnly, props, false);
             distortionDepthTest = FindProperty(kDistortionDepthTest, props, false);
             roughRefractionEnable = FindProperty(kRoughRefractionEnable, props, false);
-            refractionAbsorption = FindProperty(kRefractionAbsorption, props, false);
+            transmittanceColor = FindProperty(kTransmittanceColor, props, false);
+            atDistance = FindProperty(kATDistance, props, false);
             ior = FindProperty(kIOR, props, false);
             refractionThickness = FindProperty(kRoughRefractionThickness, props, false);
         }
@@ -164,9 +168,10 @@ namespace UnityEditor.Experimental.Rendering.HDPipeline
                     m_MaterialEditor.ShaderProperty(roughRefractionEnable, StylesBaseUnlit.roughRefractionEnableText);
                     if (roughRefractionEnable.floatValue == 1.0f)
                     {
-                        m_MaterialEditor.ShaderProperty(refractionAbsorption, StylesBaseUnlit.roughRefactionAbsorptionText);
                         m_MaterialEditor.ShaderProperty(ior, StylesBaseUnlit.roughRefractionIORText);
                         m_MaterialEditor.ShaderProperty(refractionThickness, StylesBaseUnlit.roughRefractionThicknessText);
+                        m_MaterialEditor.ShaderProperty(transmittanceColor, StylesBaseUnlit.transmittanceColorText);
+                        m_MaterialEditor.ShaderProperty(atDistance, StylesBaseUnlit.atDistanceText);
                     }
                 }
             }

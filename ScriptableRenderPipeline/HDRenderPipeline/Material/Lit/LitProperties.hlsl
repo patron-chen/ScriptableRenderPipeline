@@ -97,8 +97,9 @@ float _AlbedoAffectEmissive;
 
 float _EnableSpecularOcclusion;
 
-float3 _RefractionAbsorption;
+float3 _TransmittanceColor;
 float _IOR;
+float _ATDistance;
 
 // Caution: C# code in BaseLitUI.cs call LightmapEmissionFlagsProperty() which assume that there is an existing "_EmissionColor"
 // value that exist to identify if the GI emission need to be enabled.

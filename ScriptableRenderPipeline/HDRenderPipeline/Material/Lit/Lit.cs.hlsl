@@ -50,7 +50,8 @@
 #define DEBUGVIEW_LIT_SURFACEDATA_COAT_IOR (1015)
 #define DEBUGVIEW_LIT_SURFACEDATA_ENABLE_ROUGH_REFRACTION (1016)
 #define DEBUGVIEW_LIT_SURFACEDATA_IOR (1017)
-#define DEBUGVIEW_LIT_SURFACEDATA_REFRACTION_ABSORPTION (1018)
+#define DEBUGVIEW_LIT_SURFACEDATA_TRANSMITTANCE_COLOR (1018)
+#define DEBUGVIEW_LIT_SURFACEDATA_AT_DISTANCE (1019)
 
 //
 // UnityEngine.Experimental.Rendering.HDPipeline.Lit+TransmissionType:  static fields
@@ -85,7 +86,8 @@
 #define DEBUGVIEW_LIT_BSDFDATA_COAT_IOR (1050)
 #define DEBUGVIEW_LIT_BSDFDATA_ENABLE_ROUGH_REFRACTION (1051)
 #define DEBUGVIEW_LIT_BSDFDATA_IOR (1052)
-#define DEBUGVIEW_LIT_BSDFDATA_REFRACTION_ABSORPTION (1053)
+#define DEBUGVIEW_LIT_BSDFDATA_TRANSMITTANCE_COLOR (1053)
+#define DEBUGVIEW_LIT_BSDFDATA_AT_DISTANCE (1054)
 
 //
 // UnityEngine.Experimental.Rendering.HDPipeline.Lit+GBufferMaterial:  static fields
@@ -114,7 +116,8 @@ struct SurfaceData
     float coatIOR;
     bool enableRoughRefraction;
     float ior;
-    float3 refractionAbsorption;
+    float3 transmittanceColor;
+    float atDistance;
 };
 
 // Generated from UnityEngine.Experimental.Rendering.HDPipeline.Lit+BSDFData
@@ -144,7 +147,8 @@ struct BSDFData
     float coatIOR;
     bool enableRoughRefraction;
     float ior;
-    float3 refractionAbsorption;
+    float3 transmittanceColor;
+    float atDistance;
 };
 
 //
@@ -210,8 +214,11 @@ void GetGeneratedSurfaceDataDebug(uint paramId, SurfaceData surfacedata, inout f
         case DEBUGVIEW_LIT_SURFACEDATA_IOR:
             result = surfacedata.ior.xxx;
             break;
-        case DEBUGVIEW_LIT_SURFACEDATA_REFRACTION_ABSORPTION:
-            result = surfacedata.refractionAbsorption;
+        case DEBUGVIEW_LIT_SURFACEDATA_TRANSMITTANCE_COLOR:
+            result = surfacedata.transmittanceColor;
+            break;
+        case DEBUGVIEW_LIT_SURFACEDATA_AT_DISTANCE:
+            result = surfacedata.atDistance.xxx;
             break;
     }
 }
@@ -293,8 +300,11 @@ void GetGeneratedBSDFDataDebug(uint paramId, BSDFData bsdfdata, inout float3 res
         case DEBUGVIEW_LIT_BSDFDATA_IOR:
             result = bsdfdata.ior.xxx;
             break;
-        case DEBUGVIEW_LIT_BSDFDATA_REFRACTION_ABSORPTION:
-            result = bsdfdata.refractionAbsorption;
+        case DEBUGVIEW_LIT_BSDFDATA_TRANSMITTANCE_COLOR:
+            result = bsdfdata.transmittanceColor;
+            break;
+        case DEBUGVIEW_LIT_BSDFDATA_AT_DISTANCE:
+            result = bsdfdata.atDistance.xxx;
             break;
     }
 }

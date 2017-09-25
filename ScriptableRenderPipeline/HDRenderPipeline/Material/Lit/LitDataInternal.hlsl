@@ -217,12 +217,14 @@ float ADD_IDX(GetSurfaceData)(FragInputs input, LayerTexCoord layerTexCoord, out
 #ifdef _ROUGH_REFRACTION_ON
     surfaceData.enableRoughRefraction = true;
     surfaceData.ior = _IOR;
-    surfaceData.refractionAbsorption = _RefractionAbsorption;
+    surfaceData.transmittanceColor = _TransmittanceColor;
+    surfaceData.atDistance = _ATDistance;
     // Thickness already defined
 #else
     surfaceData.enableRoughRefraction = false;
     surfaceData.ior = 1.0;
-    surfaceData.refractionAbsorption = float3(0.0, 0.0, 0.0);
+    surfaceData.transmittanceColor = float3(0.0, 0.0, 0.0);
+    surfaceData.atDistance = 1.0;
 #endif
 
     // This part of the code is not used in case of layered shader but we keep the same macro system for simplicity
