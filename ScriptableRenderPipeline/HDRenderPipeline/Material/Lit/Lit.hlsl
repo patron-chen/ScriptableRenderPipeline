@@ -310,6 +310,10 @@ BSDFData ConvertSurfaceDataToBSDFData(SurfaceData surfaceData)
     bsdfData.perceptualRoughness = PerceptualSmoothnessToPerceptualRoughness(surfaceData.perceptualSmoothness);
     bsdfData.roughness = PerceptualRoughnessToRoughness(bsdfData.perceptualRoughness);
     bsdfData.materialId = surfaceData.materialId;
+    bsdfData.enableRoughRefraction = surfaceData.enableRoughRefraction;
+    bsdfData.ior = surfaceData.ior;
+    bsdfData.transmittanceColor = surfaceData.transmittanceColor;
+    bsdfData.atDistance = surfaceData.atDistance;
 
     // IMPORTANT: In case of foward or gbuffer pass we must know what we are statically, so compiler can do compile time optimization
     if (bsdfData.materialId == MATERIALID_LIT_STANDARD)
@@ -1467,11 +1471,23 @@ void EvaluateBSDF_Area(LightLoopContext lightLoopContext,
 // EvaluateBSDF_SSL
 // ----------------------------------------------------------------------------
 
-void EvaluateBSDF_SSL(  BSDFData bsdfData, out float3 diffuseLighting, out float3 specularLighting, out float2 weight)
+sampler2D _GaussianPyramidTexture;
+float4 _GaussianPyramidMipSize;
+
+void EvaluateBSDF_SSL(  PositionInputs posInput, BSDFData bsdfData, out float3 diffuseLighting, out float3 specularLighting, out float2 weight)
 {
     diffuseLighting = float3(0.0, 0.0, 0.0);
     specularLighting = float3(0.0, 0.0, 0.0);
     weight = float2(0.0, 0.0);
+
+    if (bsdfData.enableRoughRefraction)
+    {
+        float roughness = bsdfData.perceptualRoughness;
+        float3 c = tex2Dlod(_GaussianPyramidTexture, float4(posInput.positionSS.xy, 0.0, roughness * _GaussianPyramidMipSize.z));
+
+        diffuseLighting = c;
+        weight.x = 1.0;
+    }
 }
 
 //-----------------------------------------------------------------------------
@@ -1627,8 +1643,8 @@ void PostEvaluateBSDF(  LightLoopContext lightLoopContext, PreLightData preLight
 
     // TODO: we could call a function like PostBSDF that will apply albedo and divide by PI once for the loop
 
-    // envDiffuseLighting is not used in our case
-    diffuseLighting = (accLighting.dirDiffuseLighting + accLighting.punctualDiffuseLighting + accLighting.areaDiffuseLighting) * GTAOMultiBounce(lightLoopContext.directAmbientOcclusion, bsdfData.diffuseColor) + bakeDiffuseLighting;
+    // envDiffuseLighting is used for refraction
+    diffuseLighting = accLighting.envDiffuseLighting + (accLighting.dirDiffuseLighting + accLighting.punctualDiffuseLighting + accLighting.areaDiffuseLighting) * GTAOMultiBounce(lightLoopContext.directAmbientOcclusion, bsdfData.diffuseColor) + bakeDiffuseLighting;
     specularLighting = accLighting.dirSpecularLighting + accLighting.punctualSpecularLighting + accLighting.areaSpecularLighting + accLighting.envSpecularLighting;
 }
 

@@ -296,8 +296,10 @@ void LightLoop( float3 V, PositionInputs posInput, PreLightData preLightData, BS
     if (featureFlags & LIGHTFEATUREFLAGS_SSL)
     {
         // SSR and rough refraction
-        float2 weight = float2(0.0, 0.0);
-        EvaluateBSDF_SSL(bsdfData, accLighting.envDiffuseLighting, accLighting.envSpecularLighting, weight);
+        float3 localDiffuseLighting, localSpecularLighting;
+        float2 weight;
+        EvaluateBSDF_SSL(posInput, bsdfData, localDiffuseLighting, localSpecularLighting, weight);
+        applyWeigthedIblLighting(localDiffuseLighting, localSpecularLighting, weight, accLighting.envDiffuseLighting, accLighting.envSpecularLighting, totalIblWeight);
     }
 
     if (featureFlags & LIGHTFEATUREFLAGS_ENV || featureFlags & LIGHTFEATUREFLAGS_SKY)

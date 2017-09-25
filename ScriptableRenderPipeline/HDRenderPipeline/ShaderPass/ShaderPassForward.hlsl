@@ -24,9 +24,6 @@ PackedVaryingsToPS VertTesselation(VaryingsToDS input)
 
 #endif // TESSELLATION_ON
 
-sampler2D _GaussianPyramidTexture;
-float4 _GaussianPyramidMipSize;
-
 void Frag(PackedVaryingsToPS packedInput,
           out float4 outColor : SV_Target0
       #ifdef _DEPTHOFFSET_ON
@@ -63,13 +60,6 @@ void Frag(PackedVaryingsToPS packedInput,
     LightLoop(V, posInput, preLightData, bsdfData, bakeDiffuseLighting, featureFlags, diffuseLighting, specularLighting);
 
     outColor = float4(diffuseLighting + specularLighting, builtinData.opacity);
-
-#ifdef _ROUGH_REFRACTION_ON
-    float roughness = 1.0 - surfaceData.perceptualSmoothness;
-    float3 c = tex2Dlod(_GaussianPyramidTexture, float4(posInput.positionSS.xy, 0.0, roughness * _GaussianPyramidMipSize.z));
-
-    outColor = float4(lerp(c.rgb, outColor.rgb, builtinData.opacity), 1.0);
-#endif
     }
 
 #ifdef _DEPTHOFFSET_ON
