@@ -1469,7 +1469,9 @@ void EvaluateBSDF_Area(LightLoopContext lightLoopContext,
 
 void EvaluateBSDF_SSL(  BSDFData bsdfData, out float3 diffuseLighting, out float3 specularLighting, out float2 weight)
 {
-
+    diffuseLighting = float3(0.0, 0.0, 0.0);
+    specularLighting = float3(0.0, 0.0, 0.0);
+    weight = float2(0.0, 0.0);
 }
 
 //-----------------------------------------------------------------------------

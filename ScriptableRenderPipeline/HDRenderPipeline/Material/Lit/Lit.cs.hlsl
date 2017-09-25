@@ -48,6 +48,9 @@
 #define DEBUGVIEW_LIT_SURFACEDATA_COAT_NORMAL_WS (1013)
 #define DEBUGVIEW_LIT_SURFACEDATA_COAT_COVERAGE (1014)
 #define DEBUGVIEW_LIT_SURFACEDATA_COAT_IOR (1015)
+#define DEBUGVIEW_LIT_SURFACEDATA_ENABLE_ROUGH_REFRACTION (1016)
+#define DEBUGVIEW_LIT_SURFACEDATA_IOR (1017)
+#define DEBUGVIEW_LIT_SURFACEDATA_REFRACTION_ABSORPTION (1018)
 
 //
 // UnityEngine.Experimental.Rendering.HDPipeline.Lit+TransmissionType:  static fields
@@ -80,6 +83,9 @@
 #define DEBUGVIEW_LIT_BSDFDATA_COAT_NORMAL_WS (1048)
 #define DEBUGVIEW_LIT_BSDFDATA_COAT_COVERAGE (1049)
 #define DEBUGVIEW_LIT_BSDFDATA_COAT_IOR (1050)
+#define DEBUGVIEW_LIT_BSDFDATA_ENABLE_ROUGH_REFRACTION (1051)
+#define DEBUGVIEW_LIT_BSDFDATA_IOR (1052)
+#define DEBUGVIEW_LIT_BSDFDATA_REFRACTION_ABSORPTION (1053)
 
 //
 // UnityEngine.Experimental.Rendering.HDPipeline.Lit+GBufferMaterial:  static fields
@@ -106,6 +112,9 @@ struct SurfaceData
     float3 coatNormalWS;
     float coatCoverage;
     float coatIOR;
+    bool enableRoughRefraction;
+    float ior;
+    float3 refractionAbsorption;
 };
 
 // Generated from UnityEngine.Experimental.Rendering.HDPipeline.Lit+BSDFData
@@ -133,6 +142,9 @@ struct BSDFData
     float3 coatNormalWS;
     float coatCoverage;
     float coatIOR;
+    bool enableRoughRefraction;
+    float ior;
+    float3 refractionAbsorption;
 };
 
 //
@@ -191,6 +203,15 @@ void GetGeneratedSurfaceDataDebug(uint paramId, SurfaceData surfacedata, inout f
             break;
         case DEBUGVIEW_LIT_SURFACEDATA_COAT_IOR:
             result = surfacedata.coatIOR.xxx;
+            break;
+        case DEBUGVIEW_LIT_SURFACEDATA_ENABLE_ROUGH_REFRACTION:
+            result = (surfacedata.enableRoughRefraction) ? float3(1.0, 1.0, 1.0) : float3(0.0, 0.0, 0.0);
+            break;
+        case DEBUGVIEW_LIT_SURFACEDATA_IOR:
+            result = surfacedata.ior.xxx;
+            break;
+        case DEBUGVIEW_LIT_SURFACEDATA_REFRACTION_ABSORPTION:
+            result = surfacedata.refractionAbsorption;
             break;
     }
 }
@@ -265,6 +286,15 @@ void GetGeneratedBSDFDataDebug(uint paramId, BSDFData bsdfdata, inout float3 res
             break;
         case DEBUGVIEW_LIT_BSDFDATA_COAT_IOR:
             result = bsdfdata.coatIOR.xxx;
+            break;
+        case DEBUGVIEW_LIT_BSDFDATA_ENABLE_ROUGH_REFRACTION:
+            result = (bsdfdata.enableRoughRefraction) ? float3(1.0, 1.0, 1.0) : float3(0.0, 0.0, 0.0);
+            break;
+        case DEBUGVIEW_LIT_BSDFDATA_IOR:
+            result = bsdfdata.ior.xxx;
+            break;
+        case DEBUGVIEW_LIT_BSDFDATA_REFRACTION_ABSORPTION:
+            result = bsdfdata.refractionAbsorption;
             break;
     }
 }

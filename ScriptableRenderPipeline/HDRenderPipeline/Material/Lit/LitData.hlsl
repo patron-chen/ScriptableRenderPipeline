@@ -1,4 +1,4 @@
-//-------------------------------------------------------------------------------------
+﻿//-------------------------------------------------------------------------------------
 // Fill SurfaceData/Builtin data function
 //-------------------------------------------------------------------------------------
 #include "../../../Core/ShaderLibrary/SampleUVMapping.hlsl"
@@ -1369,6 +1369,9 @@ void GetSurfaceAndBuiltinData(FragInputs input, float3 V, inout PositionInputs p
     surfaceData.coatNormalWS = float3(0.0, 0.0, 0.0);
     surfaceData.coatCoverage = 0.0f;
     surfaceData.coatIOR = 0.5;
+    surfaceData.enableRoughRefraction = false;
+    surfaceData.ior = 1.0;
+    surfaceData.refractionAbsorption = float3(0.0, 0.0, 0.0);
 
     GetNormalWS(input, V, normalTS, surfaceData.normalWS);
     // Use bent normal to sample GI if available

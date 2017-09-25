@@ -93,12 +93,12 @@ namespace UnityEngine.Experimental.Rendering.HDPipeline
 
             // Rough Refraction
             [SurfaceDataAttributes("Enable Rough Refraction")]
-            bool enableRoughRefraction;
+            public bool enableRoughRefraction;
             [SurfaceDataAttributes("Indice of refraction")]
-            float ior;
+            public float ior;
             // Reuse thickness from SSS
             [SurfaceDataAttributes("Refraction absorption")]
-            Vector3 refractionAbsorption;
+            public Vector3 refractionAbsorption;
         };
 
         //-----------------------------------------------------------------------------
@@ -159,10 +159,10 @@ namespace UnityEngine.Experimental.Rendering.HDPipeline
             public float coatIOR; // CoatIOR is in range[1..2] it is surfaceData + 1
 
             // Rough Refraction
-            bool enableRoughRefraction;
-            float IOR;
+            public bool enableRoughRefraction;
+            public float ior;
             // Reuse thickness from SSS
-            Vector3 refractionAbsorption;
+            public Vector3 refractionAbsorption;
         };
 
         //-----------------------------------------------------------------------------

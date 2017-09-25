@@ -214,6 +214,17 @@ float ADD_IDX(GetSurfaceData)(FragInputs input, LayerTexCoord layerTexCoord, out
 #endif
     surfaceData.metallic *= ADD_IDX(_Metallic);
 
+#ifdef _ROUGH_REFRACTION_ON
+    surfaceData.enableRoughRefraction = true;
+    surfaceData.ior = _IOR;
+    surfaceData.refractionAbsorption = _RefractionAbsorption;
+    // Thickness already defined
+#else
+    surfaceData.enableRoughRefraction = false;
+    surfaceData.ior = 1.0;
+    surfaceData.refractionAbsorption = float3(0.0, 0.0, 0.0);
+#endif
+
     // This part of the code is not used in case of layered shader but we keep the same macro system for simplicity
 #if !defined(LAYERED_LIT_SHADER)
 
@@ -271,13 +282,6 @@ float ADD_IDX(GetSurfaceData)(FragInputs input, LayerTexCoord layerTexCoord, out
     surfaceData.coatCoverage    = _CoatCoverage;
     surfaceData.coatIOR         = _CoatIOR;
 
-#ifdef _ROUGH_REFRACTION_ON
-    surfaceData.enableRoughRefraction = true;
-    surfaceData.ior = _IOR;
-    surfaceData.refractionAbsorption = _RefractionAbsorption;
-    // Thickness already defined
-#endif
-
 #else // #if !defined(LAYERED_LIT_SHADER)
 
     // Mandatory to setup value to keep compiler quiet
@@ -296,9 +300,6 @@ float ADD_IDX(GetSurfaceData)(FragInputs input, LayerTexCoord layerTexCoord, out
     surfaceData.coatNormalWS = float3(0.0, 0.0, 0.0);
     surfaceData.coatCoverage = 0.0f;
     surfaceData.coatIOR = 0.5;
-    surfaceData.enableRoughRefraction = false;
-    surfaceData.ior = 1.0;
-    surfaceData.refractionAbsorption = float3(0.0, 0.0, 0.0);
 
 #endif // #if !defined(LAYERED_LIT_SHADER)
 
