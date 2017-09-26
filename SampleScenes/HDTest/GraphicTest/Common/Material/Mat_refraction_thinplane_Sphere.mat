@@ -6,10 +6,10 @@ Material:
   m_ObjectHideFlags: 0
   m_PrefabParentObject: {fileID: 0}
   m_PrefabInternal: {fileID: 0}
-  m_Name: Mat_refraction_solidplane_Cube
+  m_Name: Mat_refraction_thinplane_Sphere
   m_Shader: {fileID: 4800000, guid: 6e4ae4064600d784cac1e41a9e6f2e59, type: 3}
-  m_ShaderKeywords: _BLENDMODE_LERP _MASKMAP _NORMALMAP_TANGENT_SPACE _ROUGH_REFRACTION
-    _ROUGH_REFRACTION_ON
+  m_ShaderKeywords: _ALPHACUTOFFENABLE_OFF _BLENDMODE_LERP _NORMALMAP_TANGENT_SPACE
+    _ROUGH_REFRACTION _ROUGH_REFRACTION_ON
   m_LightmapFlags: 1
   m_EnableInstancingVariants: 0
   m_DoubleSidedGI: 0
@@ -82,7 +82,7 @@ Material:
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
     - _MaskMap:
-        m_Texture: {fileID: 2800000, guid: 9edd5a06bcc2fec4398c5d34172f5d8d, type: 3}
+        m_Texture: {fileID: 0}
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
     - _MetallicGlossMap:
@@ -134,7 +134,7 @@ Material:
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
     m_Floats:
-    - _ATDistance: 0
+    - _ATDistance: 0.75
     - _AlbedoAffectEmissive: 0
     - _AlphaCutoff: 0.5
     - _AlphaCutoffEnable: 0
@@ -175,7 +175,7 @@ Material:
     - _HeightMin: -1
     - _HeightScale: 1
     - _HorizonFade: 1
-    - _IOR: 1.355
+    - _IOR: 1.885
     - _InitialBend: 1
     - _MaterialID: 1
     - _Metalic: 1
@@ -191,7 +191,7 @@ Material:
     - _RoughRefractionEnable: 1
     - _ShiverDirectionality: 0.5
     - _ShiverDrag: 0.2
-    - _Smoothness: 0.568
+    - _Smoothness: 1
     - _SmoothnessRemapMax: 0.7658151
     - _SmoothnessRemapMin: 0.3482996
     - _SmoothnessTextureChannel: 0
@@ -204,7 +204,7 @@ Material:
     - _SubsurfaceRadius: 1
     - _SurfaceType: 1
     - _TexWorldScale: 1
-    - _Thickness: 0.5
+    - _Thickness: 1
     - _ThicknessMultiplier: 1
     - _UVBase: 0
     - _UVDetail: 0

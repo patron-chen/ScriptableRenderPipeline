@@ -315,6 +315,7 @@ BSDFData ConvertSurfaceDataToBSDFData(SurfaceData surfaceData)
     bsdfData.transmittanceColor = surfaceData.transmittanceColor;
     bsdfData.atDistance = surfaceData.atDistance;
     bsdfData.thicknessMultiplier = surfaceData.thicknessMultiplier;
+    bsdfData.thickness = surfaceData.thickness; // TODO: it may override SSS's parameter
 
     // IMPORTANT: In case of foward or gbuffer pass we must know what we are statically, so compiler can do compile time optimization
     if (bsdfData.materialId == MATERIALID_LIT_STANDARD)
@@ -1496,9 +1497,10 @@ void EvaluateBSDF_SSL(  float3 V, PositionInputs posInput, BSDFData bsdfData, ou
         if (bsdfData.atDistance <= 0.1)
         {
             // Solid plane
+            // Ray only refact once, like if it solid
             float3 R = refract(-V, bsdfData.normalWS, 1.0/bsdfData.ior);
-            float depth = LOAD_TEXTURE2D(_MainDepthTexture, posInput.unPositionSS).x;
-            float3 backPointWS = ComputeWorldSpacePosition(posInput.positionSS, depth, _InvViewProjMatrix);
+            /*float depth = LOAD_TEXTURE2D(_MainDepthTexture, posInput.unPositionSS).x;
+            float3 backPointWS = ComputeWorldSpacePosition(posInput.positionSS, depth, _InvViewProjMatrix);*/
             float distFromP = 20.0;// length(backPointWS - posInput.positionWS);
 
             float VoR = dot(-V, R);
@@ -1521,7 +1523,7 @@ void EvaluateBSDF_SSL(  float3 V, PositionInputs posInput, BSDFData bsdfData, ou
         }
         else if (bsdfData.atDistance <= 0.25)
         {
-            // Unreal distorsion + sin
+            // Unreal distorsion (solid)
             float3 NVS = mul(_ViewMatrix, float4(bsdfData.normalWS, 0.0));
             float2 Distorsion = NVS.xy * (bsdfData.ior - 1.0) * dot(-V, bsdfData.normalWS);
             float2 refractedBackPointSS = posInput.positionSS + Distorsion;
@@ -1544,7 +1546,7 @@ void EvaluateBSDF_SSL(  float3 V, PositionInputs posInput, BSDFData bsdfData, ou
         }
         else if (bsdfData.atDistance <= 0.5)
         {
-            // Unreal distorsion
+            // Unreal distorsion (thick)
             float3 NVS = mul(_ViewMatrix, float4(bsdfData.normalWS, 0.0));
             float2 Distorsion = NVS.xy * (bsdfData.ior - 1.0);
             float2 refractedBackPointSS = posInput.positionSS + Distorsion;
@@ -1589,8 +1591,6 @@ void EvaluateBSDF_SSL(  float3 V, PositionInputs posInput, BSDFData bsdfData, ou
             }
 
             float3 c = tex2Dlod(_GaussianPyramidColorTexture, float4(refractedBackPointSS.xy, 0.0, 0.0));
-
-            c = float3(absorptionDistance, absorptionDistance, absorptionDistance);
 
             diffuseLighting = c;
             weight.x = 1.0;
