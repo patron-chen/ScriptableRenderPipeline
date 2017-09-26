@@ -1,5 +1,6 @@
 ﻿using System;
 using UnityEngine;
+using UnityEngine.Experimental.Rendering.HDPipeline;
 using UnityEngine.Rendering;
 
 namespace UnityEditor.Experimental.Rendering.HDPipeline
@@ -17,6 +18,7 @@ namespace UnityEditor.Experimental.Rendering.HDPipeline
             public static string blendModeText = "Blend Mode";
 
             public static readonly string[] surfaceTypeNames = Enum.GetNames(typeof(SurfaceType));
+            public static readonly string[] refractionModeTypeNames = Enum.GetNames(typeof(Lit.RefractionMode));
             public static readonly string[] blendModeNames = Enum.GetNames(typeof(BlendMode));
 
             public static GUIContent alphaCutoffEnableText = new GUIContent("Alpha Cutoff Enable", "Threshold for alpha cutoff");
@@ -29,9 +31,10 @@ namespace UnityEditor.Experimental.Rendering.HDPipeline
             public static GUIContent roughRefractionEnableText = new GUIContent("Rough Refraction", "Enable rough refraction on this shader"); 
             public static GUIContent transmittanceColorText = new GUIContent("Transmittance Color", "Absorption color (RGB)");
             public static GUIContent atDistanceText = new GUIContent("Transmittance Absorption Distance", "Absorption distance reference");
-            public static GUIContent thicknessMultiplierText = new GUIContent("Thickness multiplier", "Thickness multiplier");
+            public static GUIContent thicknessMultiplierText = new GUIContent("Thickness multiplier", "Thickness multiplier"); 
             public static GUIContent roughRefractionThicknessText = new GUIContent("Rough Refraction Thickness", "Thickness for rough refraction");
             public static GUIContent roughRefractionIORText = new GUIContent("Indice of refraction", "Indice of refraction");
+            public static string refractionModeText = "Refraction Mode";
 
             public static string advancedText = "Advanced Options";
         }
@@ -80,6 +83,8 @@ namespace UnityEditor.Experimental.Rendering.HDPipeline
         protected const string kATDistance = "_ATDistance";
         protected MaterialProperty thicknessMultiplier = null;
         protected const string kThicknessMultiplier = "_ThicknessMultiplier";
+        protected MaterialProperty refractionMode = null;
+        protected const string kRefractionMode = "_RefractionMode";
         protected MaterialProperty refractionThickness = null;
         protected const string kRoughRefractionThickness = "_Thickness"; // Same as SSS thickness
 
@@ -106,6 +111,7 @@ namespace UnityEditor.Experimental.Rendering.HDPipeline
             distortionOnly = FindProperty(kDistortionOnly, props, false);
             distortionDepthTest = FindProperty(kDistortionDepthTest, props, false);
             roughRefractionEnable = FindProperty(kRoughRefractionEnable, props, false);
+            refractionMode = FindProperty(kRefractionMode, props, false);
             transmittanceColor = FindProperty(kTransmittanceColor, props, false);
             atDistance = FindProperty(kATDistance, props, false);
             thicknessMultiplier = FindProperty(kThicknessMultiplier, props, false);
@@ -173,8 +179,22 @@ namespace UnityEditor.Experimental.Rendering.HDPipeline
                     if (roughRefractionEnable.floatValue == 1.0f)
                     {
                         m_MaterialEditor.ShaderProperty(ior, StylesBaseUnlit.roughRefractionIORText);
-                        m_MaterialEditor.ShaderProperty(refractionThickness, StylesBaseUnlit.roughRefractionThicknessText);
-                        m_MaterialEditor.ShaderProperty(thicknessMultiplier, StylesBaseUnlit.thicknessMultiplierText);
+
+                        var mode = (Lit.RefractionMode)refractionMode.floatValue;
+                        EditorGUI.BeginChangeCheck();
+                        mode = (Lit.RefractionMode)EditorGUILayout.Popup(StylesBaseUnlit.refractionModeText, (int)mode, StylesBaseUnlit.refractionModeTypeNames);
+                        if (EditorGUI.EndChangeCheck())
+                        {
+                            m_MaterialEditor.RegisterPropertyChangeUndo("Refraction Mode");
+                            refractionMode.floatValue = (float)mode;
+                        }
+
+                        if (mode == Lit.RefractionMode.Thick)
+                        {
+                            m_MaterialEditor.ShaderProperty(refractionThickness, StylesBaseUnlit.roughRefractionThicknessText);
+                            m_MaterialEditor.ShaderProperty(thicknessMultiplier, StylesBaseUnlit.thicknessMultiplierText);
+                        }
+
                         m_MaterialEditor.ShaderProperty(transmittanceColor, StylesBaseUnlit.transmittanceColorText);
                         m_MaterialEditor.ShaderProperty(atDistance, StylesBaseUnlit.atDistanceText);
                     }

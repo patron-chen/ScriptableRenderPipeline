@@ -82,6 +82,7 @@
         _TransmittanceColor("Transmittance Color", Color) = (0.0, 0.0, 0.0)
         _ATDistance("Transmittance Absorption Distance", Float) = 1.0
         _ThicknessMultiplier("Thickness Multiplier", Float) = 1.0
+        [ToggleOff]  _RefractionMode("Refraction Mode", Int) = 0
 
         // Stencil state
         [HideInInspector] _StencilRef("_StencilRef", Int) = 2 // StencilLightingUsage.RegularLighting  (fixed at compile time)

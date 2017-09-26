@@ -38,6 +38,13 @@ namespace UnityEngine.Experimental.Rendering.HDPipeline
             public static float s_SkinSpecularValue = 0.028f;
         }
 
+        [GenerateHLSL(PackingRules.Exact)]
+        public enum RefractionMode
+        {
+            Solid = 0,
+            Thick = 1
+        };
+
         //-----------------------------------------------------------------------------
         // SurfaceData
         //-----------------------------------------------------------------------------
@@ -103,6 +110,8 @@ namespace UnityEngine.Experimental.Rendering.HDPipeline
             public Vector3 transmittanceColor;
             [SurfaceDataAttributes("Transmittance Absorption Distance")]
             public float atDistance;
+            [SurfaceDataAttributes("Refraction Mode")]
+            public RefractionMode refractionMode;
         };
 
         //-----------------------------------------------------------------------------
@@ -164,6 +173,7 @@ namespace UnityEngine.Experimental.Rendering.HDPipeline
 
             // Rough Refraction
             public bool enableRoughRefraction;
+            public int refractionMode;
             public float ior;
             // Reuse thickness from SSS
             public Vector3 transmittanceColor;

@@ -220,6 +220,7 @@ float ADD_IDX(GetSurfaceData)(FragInputs input, LayerTexCoord layerTexCoord, out
     surfaceData.transmittanceColor = _TransmittanceColor;
     surfaceData.atDistance = _ATDistance;
     surfaceData.thicknessMultiplier = _ThicknessMultiplier;
+    surfaceData.refractionMode = _RefractionMode;
     // Thickness already defined
 #else
     surfaceData.enableRoughRefraction = false;
@@ -227,6 +228,7 @@ float ADD_IDX(GetSurfaceData)(FragInputs input, LayerTexCoord layerTexCoord, out
     surfaceData.transmittanceColor = float3(0.0, 0.0, 0.0);
     surfaceData.atDistance = 1.0;
     surfaceData.thicknessMultiplier = 1.0;
+    surfaceData.refractionMode = 0;
 #endif
 
     // This part of the code is not used in case of layered shader but we keep the same macro system for simplicity
@@ -304,6 +306,7 @@ float ADD_IDX(GetSurfaceData)(FragInputs input, LayerTexCoord layerTexCoord, out
     surfaceData.coatNormalWS = float3(0.0, 0.0, 0.0);
     surfaceData.coatCoverage = 0.0f;
     surfaceData.coatIOR = 0.5;
+    surfaceData.refractionMode = 0;
 
 #endif // #if !defined(LAYERED_LIT_SHADER)
 

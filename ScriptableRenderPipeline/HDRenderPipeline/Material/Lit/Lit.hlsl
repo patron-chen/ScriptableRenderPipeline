@@ -316,6 +316,7 @@ BSDFData ConvertSurfaceDataToBSDFData(SurfaceData surfaceData)
     bsdfData.atDistance = surfaceData.atDistance;
     bsdfData.thicknessMultiplier = surfaceData.thicknessMultiplier;
     bsdfData.thickness = surfaceData.thickness; // TODO: it may override SSS's parameter
+    bsdfData.refractionMode = surfaceData.refractionMode;
 
     // IMPORTANT: In case of foward or gbuffer pass we must know what we are statically, so compiler can do compile time optimization
     if (bsdfData.materialId == MATERIALID_LIT_STANDARD)
@@ -1476,16 +1477,6 @@ void EvaluateBSDF_Area(LightLoopContext lightLoopContext,
 sampler2D _GaussianPyramidColorTexture;
 float4 _GaussianPyramidColorMipSize;
 
-float3 Refract_Snell(float3 I, float3 N, float relIOR)
-{
-    float c = -dot(I, N);
-    float k = 1.0 - relIOR*relIOR*(1.0 - c*c);
-    if (k < 0.0)
-        return float3(0.0, 0.0, 0.0);
-
-    return normalize(relIOR*I + N*(relIOR*c - sqrt(k)));
-}
-
 void EvaluateBSDF_SSL(  float3 V, PositionInputs posInput, BSDFData bsdfData, out float3 diffuseLighting, out float3 specularLighting, out float2 weight)
 {
     diffuseLighting = float3(0.0, 0.0, 0.0);
@@ -1494,14 +1485,12 @@ void EvaluateBSDF_SSL(  float3 V, PositionInputs posInput, BSDFData bsdfData, ou
 
     if (bsdfData.enableRoughRefraction)
     {
-        if (bsdfData.atDistance <= 0.1)
+        if (bsdfData.refractionMode == 0.0)
         {
             // Solid plane
             // Ray only refact once, like if it solid
             float3 R = refract(-V, bsdfData.normalWS, 1.0/bsdfData.ior);
-            /*float depth = LOAD_TEXTURE2D(_MainDepthTexture, posInput.unPositionSS).x;
-            float3 backPointWS = ComputeWorldSpacePosition(posInput.positionSS, depth, _InvViewProjMatrix);*/
-            float distFromP = 20.0;// length(backPointWS - posInput.positionWS);
+            float distFromP = 20.0;
 
             float VoR = dot(-V, R);
             float3 refractedBackPointWS = posInput.positionWS + R*distFromP / VoR;
@@ -1521,53 +1510,7 @@ void EvaluateBSDF_SSL(  float3 V, PositionInputs posInput, BSDFData bsdfData, ou
             diffuseLighting = c;
             weight.x = 1.0;
         }
-        else if (bsdfData.atDistance <= 0.25)
-        {
-            // Unreal distorsion (solid)
-            float3 NVS = mul(_ViewMatrix, float4(bsdfData.normalWS, 0.0));
-            float2 Distorsion = NVS.xy * (bsdfData.ior - 1.0) * dot(-V, bsdfData.normalWS);
-            float2 refractedBackPointSS = posInput.positionSS + Distorsion;
-
-            // pixel out of buffer
-            if (refractedBackPointSS.x < 0.0 || refractedBackPointSS.x > 1.0
-                || refractedBackPointSS.y < 0.0 || refractedBackPointSS.y > 1.0)
-            {
-                diffuseLighting = tex2Dlod(_GaussianPyramidColorTexture, float4(posInput.positionSS, 0.0, 0.0)).rgb;
-                return;
-            }
-
-            float3 c = tex2Dlod(_GaussianPyramidColorTexture, float4(refractedBackPointSS, 0.0, 0.0));
-
-            //float roughness = bsdfData.perceptualRoughness;
-            //float3 c = tex2Dlod(_GaussianPyramidColorTexture, float4(posInput.positionSS.xy, 0.0, roughness * _GaussianPyramidColorMipSize.z));
-
-            diffuseLighting = c;
-            weight.x = 1.0;
-        }
-        else if (bsdfData.atDistance <= 0.5)
-        {
-            // Unreal distorsion (thick)
-            float3 NVS = mul(_ViewMatrix, float4(bsdfData.normalWS, 0.0));
-            float2 Distorsion = NVS.xy * (bsdfData.ior - 1.0);
-            float2 refractedBackPointSS = posInput.positionSS + Distorsion;
-
-            // pixel out of buffer
-            if (refractedBackPointSS.x < 0.0 || refractedBackPointSS.x > 1.0
-                || refractedBackPointSS.y < 0.0 || refractedBackPointSS.y > 1.0)
-            {
-                diffuseLighting = tex2Dlod(_GaussianPyramidColorTexture, float4(posInput.positionSS, 0.0, 0.0)).rgb;
-                return;
-            }
-
-            float3 c = tex2Dlod(_GaussianPyramidColorTexture, float4(refractedBackPointSS, 0.0, 0.0));
-
-            //float roughness = bsdfData.perceptualRoughness;
-            //float3 c = tex2Dlod(_GaussianPyramidColorTexture, float4(posInput.positionSS.xy, 0.0, roughness * _GaussianPyramidColorMipSize.z));
-
-            diffuseLighting = c;
-            weight.x = 1.0;
-        }
-        else if (bsdfData.atDistance <= 0.75)
+        else if (bsdfData.refractionMode == 1.0)
         {
             // thick plane
             float3 R = refract(-V, bsdfData.normalWS, 1.0 / bsdfData.ior);

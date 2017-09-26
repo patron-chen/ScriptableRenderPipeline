@@ -30,6 +30,12 @@
 #define SKIN_SPECULAR_VALUE (0.028)
 
 //
+// UnityEngine.Experimental.Rendering.HDPipeline.Lit+RefractionMode:  static fields
+//
+#define REFRACTIONMODE_SOLID (0)
+#define REFRACTIONMODE_THICK (1)
+
+//
 // UnityEngine.Experimental.Rendering.HDPipeline.Lit+SurfaceData:  static fields
 //
 #define DEBUGVIEW_LIT_SURFACEDATA_BASE_COLOR (1000)
@@ -53,6 +59,7 @@
 #define DEBUGVIEW_LIT_SURFACEDATA_THICKNESS_MULTIPLIER (1018)
 #define DEBUGVIEW_LIT_SURFACEDATA_TRANSMITTANCE_COLOR (1019)
 #define DEBUGVIEW_LIT_SURFACEDATA_AT_DISTANCE (1020)
+#define DEBUGVIEW_LIT_SURFACEDATA_REFRACTION_MODE (1021)
 
 //
 // UnityEngine.Experimental.Rendering.HDPipeline.Lit+TransmissionType:  static fields
@@ -86,10 +93,11 @@
 #define DEBUGVIEW_LIT_BSDFDATA_COAT_COVERAGE (1049)
 #define DEBUGVIEW_LIT_BSDFDATA_COAT_IOR (1050)
 #define DEBUGVIEW_LIT_BSDFDATA_ENABLE_ROUGH_REFRACTION (1051)
-#define DEBUGVIEW_LIT_BSDFDATA_IOR (1052)
-#define DEBUGVIEW_LIT_BSDFDATA_TRANSMITTANCE_COLOR (1053)
-#define DEBUGVIEW_LIT_BSDFDATA_AT_DISTANCE (1054)
-#define DEBUGVIEW_LIT_BSDFDATA_THICKNESS_MULTIPLIER (1055)
+#define DEBUGVIEW_LIT_BSDFDATA_REFRACTION_MODE (1052)
+#define DEBUGVIEW_LIT_BSDFDATA_IOR (1053)
+#define DEBUGVIEW_LIT_BSDFDATA_TRANSMITTANCE_COLOR (1054)
+#define DEBUGVIEW_LIT_BSDFDATA_AT_DISTANCE (1055)
+#define DEBUGVIEW_LIT_BSDFDATA_THICKNESS_MULTIPLIER (1056)
 
 //
 // UnityEngine.Experimental.Rendering.HDPipeline.Lit+GBufferMaterial:  static fields
@@ -121,6 +129,7 @@ struct SurfaceData
     float thicknessMultiplier;
     float3 transmittanceColor;
     float atDistance;
+    int refractionMode;
 };
 
 // Generated from UnityEngine.Experimental.Rendering.HDPipeline.Lit+BSDFData
@@ -149,6 +158,7 @@ struct BSDFData
     float coatCoverage;
     float coatIOR;
     bool enableRoughRefraction;
+    int refractionMode;
     float ior;
     float3 transmittanceColor;
     float atDistance;
@@ -227,6 +237,9 @@ void GetGeneratedSurfaceDataDebug(uint paramId, SurfaceData surfacedata, inout f
         case DEBUGVIEW_LIT_SURFACEDATA_AT_DISTANCE:
             result = surfacedata.atDistance.xxx;
             break;
+        case DEBUGVIEW_LIT_SURFACEDATA_REFRACTION_MODE:
+            result = GetIndexColor(surfacedata.refractionMode);
+            break;
     }
 }
 
@@ -303,6 +316,9 @@ void GetGeneratedBSDFDataDebug(uint paramId, BSDFData bsdfdata, inout float3 res
             break;
         case DEBUGVIEW_LIT_BSDFDATA_ENABLE_ROUGH_REFRACTION:
             result = (bsdfdata.enableRoughRefraction) ? float3(1.0, 1.0, 1.0) : float3(0.0, 0.0, 0.0);
+            break;
+        case DEBUGVIEW_LIT_BSDFDATA_REFRACTION_MODE:
+            result = GetIndexColor(bsdfdata.refractionMode);
             break;
         case DEBUGVIEW_LIT_BSDFDATA_IOR:
             result = bsdfdata.ior.xxx;

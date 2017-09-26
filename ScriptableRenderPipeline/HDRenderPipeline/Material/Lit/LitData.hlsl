@@ -1374,6 +1374,7 @@ void GetSurfaceAndBuiltinData(FragInputs input, float3 V, inout PositionInputs p
     surfaceData.transmittanceColor = float3(0.0, 0.0, 0.0);
     surfaceData.atDistance = 1.0;
     surfaceData.thicknessMultiplier = 1.0;
+    surfaceData.refractionMode = 0;
 
     GetNormalWS(input, V, normalTS, surfaceData.normalWS);
     // Use bent normal to sample GI if available
