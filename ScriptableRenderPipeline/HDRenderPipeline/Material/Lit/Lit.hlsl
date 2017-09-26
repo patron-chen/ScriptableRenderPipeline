@@ -1471,10 +1471,20 @@ void EvaluateBSDF_Area(LightLoopContext lightLoopContext,
 // EvaluateBSDF_SSL
 // ----------------------------------------------------------------------------
 
-sampler2D _GaussianPyramidTexture;
-float4 _GaussianPyramidMipSize;
+sampler2D _GaussianPyramidColorTexture;
+float4 _GaussianPyramidColorMipSize;
 
-void EvaluateBSDF_SSL(  PositionInputs posInput, BSDFData bsdfData, out float3 diffuseLighting, out float3 specularLighting, out float2 weight)
+float3 Refract_Snell(float3 I, float3 N, float relIOR)
+{
+    float c = -dot(I, N);
+    float k = 1.0 - relIOR*relIOR*(1.0 - c*c);
+    if (k < 0.0)
+        return float3(0.0, 0.0, 0.0);
+
+    return normalize(relIOR*I + N*(relIOR*c - sqrt(k)));
+}
+
+void EvaluateBSDF_SSL(  float3 V, PositionInputs posInput, BSDFData bsdfData, out float3 diffuseLighting, out float3 specularLighting, out float2 weight)
 {
     diffuseLighting = float3(0.0, 0.0, 0.0);
     specularLighting = float3(0.0, 0.0, 0.0);
@@ -1482,11 +1492,39 @@ void EvaluateBSDF_SSL(  PositionInputs posInput, BSDFData bsdfData, out float3 d
 
     if (bsdfData.enableRoughRefraction)
     {
-        float roughness = bsdfData.perceptualRoughness;
-        float3 c = tex2Dlod(_GaussianPyramidTexture, float4(posInput.positionSS.xy, 0.0, roughness * _GaussianPyramidMipSize.z));
+        if (bsdfData.atDistance <= 0.1)
+        {
+            // Solid plane
+            float3 R = refract(-V, bsdfData.normalWS, 1.0/bsdfData.ior);
+            float depth = LOAD_TEXTURE2D(_MainDepthTexture, posInput.unPositionSS).x;
+            float3 backPointWS = ComputeWorldSpacePosition(posInput.positionSS, depth, _InvViewProjMatrix);
+            float distFromP = length(backPointWS - posInput.positionWS);
 
-        diffuseLighting = c;
-        weight.x = 1.0;
+            float VoR = dot(-V, R);
+            float3 refractedBackPointWS = posInput.positionWS + R*distFromP / VoR;
+            float4 refractedBackPointCS = mul(_ViewProjMatrix, float4(refractedBackPointWS, 1.0));
+            float2 refractedBackPointSS = ComputeScreenSpacePosition(refractedBackPointCS);
+            refractedBackPointSS = clamp(refractedBackPointSS, float4(0.0, 0.0, 0.0, 0.0), float4(1.0, 1.0, 1.0, 1.0));
+            float3 c = tex2Dlod(_GaussianPyramidColorTexture, float4(refractedBackPointSS.xy, 0.0, 0.0));
+
+            diffuseLighting = c;
+            weight.x = 1.0;
+        }
+        else if (bsdfData.atDistance <= 0.25)
+        {
+            // Unreal distorsion
+            float3 NVS = mul(_ViewMatrix, float4(bsdfData.normalWS, 0.0));
+            float2 Distorsion = NVS.xy * (bsdfData.ior - 1.0);
+            float2 refractedBackPointSS = posInput.positionSS + Distorsion;
+            
+            float3 c = tex2Dlod(_GaussianPyramidColorTexture, float4(clamp(refractedBackPointSS, float2(0.0, 0.0), float2(1.0, 1.0)), 0.0, 0.0));
+
+            //float roughness = bsdfData.perceptualRoughness;
+            //float3 c = tex2Dlod(_GaussianPyramidColorTexture, float4(posInput.positionSS.xy, 0.0, roughness * _GaussianPyramidColorMipSize.z));
+
+            diffuseLighting = c;
+            weight.x = 1.0;
+        }
     }
 }
 

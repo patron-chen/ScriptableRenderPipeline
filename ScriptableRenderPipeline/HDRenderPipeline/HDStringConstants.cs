@@ -176,8 +176,10 @@
 
         internal static readonly int _VelocityTexture = Shader.PropertyToID("_VelocityTexture");
         internal static readonly int _DistortionTexture = Shader.PropertyToID("_DistortionTexture"); 
-        internal static readonly int _GaussianPyramidTexture = Shader.PropertyToID("_GaussianPyramidTexture");
-        internal static readonly int _GaussianPyramidMipSize = Shader.PropertyToID("_GaussianPyramidMipSize");
+        internal static readonly int _GaussianPyramidColorTexture = Shader.PropertyToID("_GaussianPyramidColorTexture");
+        internal static readonly int _GaussianPyramidDepthTexture = Shader.PropertyToID("_GaussianPyramidDepthTexture");
+        internal static readonly int _GaussianPyramidColorMipSize = Shader.PropertyToID("_GaussianPyramidColorMipSize");
+        internal static readonly int _GaussianPyramidDepthMipSize = Shader.PropertyToID("_GaussianPyramidDepthMipSize");
         internal static readonly int _DebugFullScreenTexture = Shader.PropertyToID("_DebugFullScreenTexture");
 
         internal static readonly int _WorldScales = Shader.PropertyToID("_WorldScales");
