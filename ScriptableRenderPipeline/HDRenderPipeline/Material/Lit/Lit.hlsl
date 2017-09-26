@@ -314,6 +314,7 @@ BSDFData ConvertSurfaceDataToBSDFData(SurfaceData surfaceData)
     bsdfData.ior = surfaceData.ior;
     bsdfData.transmittanceColor = surfaceData.transmittanceColor;
     bsdfData.atDistance = surfaceData.atDistance;
+    bsdfData.thicknessMultiplier = surfaceData.thicknessMultiplier;
 
     // IMPORTANT: In case of foward or gbuffer pass we must know what we are statically, so compiler can do compile time optimization
     if (bsdfData.materialId == MATERIALID_LIT_STANDARD)
@@ -1498,13 +1499,21 @@ void EvaluateBSDF_SSL(  float3 V, PositionInputs posInput, BSDFData bsdfData, ou
             float3 R = refract(-V, bsdfData.normalWS, 1.0/bsdfData.ior);
             float depth = LOAD_TEXTURE2D(_MainDepthTexture, posInput.unPositionSS).x;
             float3 backPointWS = ComputeWorldSpacePosition(posInput.positionSS, depth, _InvViewProjMatrix);
-            float distFromP = length(backPointWS - posInput.positionWS);
+            float distFromP = 20.0;// length(backPointWS - posInput.positionWS);
 
             float VoR = dot(-V, R);
-            float3 refractedBackPointWS = posInput.positionWS + R*20.0 / VoR;
+            float3 refractedBackPointWS = posInput.positionWS + R*distFromP / VoR;
             float4 refractedBackPointCS = mul(_ViewProjMatrix, float4(refractedBackPointWS, 1.0));
             float2 refractedBackPointSS = ComputeScreenSpacePosition(refractedBackPointCS);
-            //refractedBackPointSS = clamp(refractedBackPointSS, float4(0.0, 0.0, 0.0, 0.0), float4(1.0, 1.0, 1.0, 1.0));
+
+            // pixel out of buffer
+            if (refractedBackPointSS.x < 0.0 || refractedBackPointSS.x > 1.0
+                || refractedBackPointSS.y < 0.0 || refractedBackPointSS.y > 1.0)
+            {
+                diffuseLighting = tex2Dlod(_GaussianPyramidColorTexture, float4(posInput.positionSS, 0.0, 0.0)).rgb;
+                return;
+            }
+
             float3 c = tex2Dlod(_GaussianPyramidColorTexture, float4(refractedBackPointSS.xy, 0.0, 0.0));
 
             diffuseLighting = c;
@@ -1516,6 +1525,14 @@ void EvaluateBSDF_SSL(  float3 V, PositionInputs posInput, BSDFData bsdfData, ou
             float3 NVS = mul(_ViewMatrix, float4(bsdfData.normalWS, 0.0));
             float2 Distorsion = NVS.xy * (bsdfData.ior - 1.0) * dot(-V, bsdfData.normalWS);
             float2 refractedBackPointSS = posInput.positionSS + Distorsion;
+
+            // pixel out of buffer
+            if (refractedBackPointSS.x < 0.0 || refractedBackPointSS.x > 1.0
+                || refractedBackPointSS.y < 0.0 || refractedBackPointSS.y > 1.0)
+            {
+                diffuseLighting = tex2Dlod(_GaussianPyramidColorTexture, float4(posInput.positionSS, 0.0, 0.0)).rgb;
+                return;
+            }
 
             float3 c = tex2Dlod(_GaussianPyramidColorTexture, float4(refractedBackPointSS, 0.0, 0.0));
 
@@ -1532,10 +1549,48 @@ void EvaluateBSDF_SSL(  float3 V, PositionInputs posInput, BSDFData bsdfData, ou
             float2 Distorsion = NVS.xy * (bsdfData.ior - 1.0);
             float2 refractedBackPointSS = posInput.positionSS + Distorsion;
 
+            // pixel out of buffer
+            if (refractedBackPointSS.x < 0.0 || refractedBackPointSS.x > 1.0
+                || refractedBackPointSS.y < 0.0 || refractedBackPointSS.y > 1.0)
+            {
+                diffuseLighting = tex2Dlod(_GaussianPyramidColorTexture, float4(posInput.positionSS, 0.0, 0.0)).rgb;
+                return;
+            }
+
             float3 c = tex2Dlod(_GaussianPyramidColorTexture, float4(refractedBackPointSS, 0.0, 0.0));
 
             //float roughness = bsdfData.perceptualRoughness;
             //float3 c = tex2Dlod(_GaussianPyramidColorTexture, float4(posInput.positionSS.xy, 0.0, roughness * _GaussianPyramidColorMipSize.z));
+
+            diffuseLighting = c;
+            weight.x = 1.0;
+        }
+        else if (bsdfData.atDistance <= 0.75)
+        {
+            // thick plane
+            float3 R = refract(-V, bsdfData.normalWS, 1.0 / bsdfData.ior);
+            /*float depth = LOAD_TEXTURE2D(_MainDepthTexture, posInput.unPositionSS).x;
+            float3 backPointWS = ComputeWorldSpacePosition(posInput.positionSS, depth, _InvViewProjMatrix);*/
+            float distFromP = 20.0;// length(backPointWS - posInput.positionWS);
+            float absorptionDistance = bsdfData.thickness * bsdfData.thicknessMultiplier / dot(R, -bsdfData.normalWS);
+
+            float VoR = dot(-V, R);
+            float VoN = dot(V, bsdfData.normalWS);
+            float3 refractedBackPointWS = posInput.positionWS + R*absorptionDistance - V*(distFromP - VoR*absorptionDistance);
+            float4 refractedBackPointCS = mul(_ViewProjMatrix, float4(refractedBackPointWS, 1.0));
+            float2 refractedBackPointSS = ComputeScreenSpacePosition(refractedBackPointCS);
+
+            // pixel out of buffer
+            if (refractedBackPointSS.x < 0.0 || refractedBackPointSS.x > 1.0
+                || refractedBackPointSS.y < 0.0 || refractedBackPointSS.y > 1.0)
+            {
+                diffuseLighting = tex2Dlod(_GaussianPyramidColorTexture, float4(posInput.positionSS, 0.0, 0.0)).rgb;
+                return;
+            }
+
+            float3 c = tex2Dlod(_GaussianPyramidColorTexture, float4(refractedBackPointSS.xy, 0.0, 0.0));
+
+            c = float3(absorptionDistance, absorptionDistance, absorptionDistance);
 
             diffuseLighting = c;
             weight.x = 1.0;

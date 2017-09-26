@@ -50,8 +50,9 @@
 #define DEBUGVIEW_LIT_SURFACEDATA_COAT_IOR (1015)
 #define DEBUGVIEW_LIT_SURFACEDATA_ENABLE_ROUGH_REFRACTION (1016)
 #define DEBUGVIEW_LIT_SURFACEDATA_IOR (1017)
-#define DEBUGVIEW_LIT_SURFACEDATA_TRANSMITTANCE_COLOR (1018)
-#define DEBUGVIEW_LIT_SURFACEDATA_AT_DISTANCE (1019)
+#define DEBUGVIEW_LIT_SURFACEDATA_THICKNESS_MULTIPLIER (1018)
+#define DEBUGVIEW_LIT_SURFACEDATA_TRANSMITTANCE_COLOR (1019)
+#define DEBUGVIEW_LIT_SURFACEDATA_AT_DISTANCE (1020)
 
 //
 // UnityEngine.Experimental.Rendering.HDPipeline.Lit+TransmissionType:  static fields
@@ -88,6 +89,7 @@
 #define DEBUGVIEW_LIT_BSDFDATA_IOR (1052)
 #define DEBUGVIEW_LIT_BSDFDATA_TRANSMITTANCE_COLOR (1053)
 #define DEBUGVIEW_LIT_BSDFDATA_AT_DISTANCE (1054)
+#define DEBUGVIEW_LIT_BSDFDATA_THICKNESS_MULTIPLIER (1055)
 
 //
 // UnityEngine.Experimental.Rendering.HDPipeline.Lit+GBufferMaterial:  static fields
@@ -116,6 +118,7 @@ struct SurfaceData
     float coatIOR;
     bool enableRoughRefraction;
     float ior;
+    float thicknessMultiplier;
     float3 transmittanceColor;
     float atDistance;
 };
@@ -149,6 +152,7 @@ struct BSDFData
     float ior;
     float3 transmittanceColor;
     float atDistance;
+    float thicknessMultiplier;
 };
 
 //
@@ -213,6 +217,9 @@ void GetGeneratedSurfaceDataDebug(uint paramId, SurfaceData surfacedata, inout f
             break;
         case DEBUGVIEW_LIT_SURFACEDATA_IOR:
             result = surfacedata.ior.xxx;
+            break;
+        case DEBUGVIEW_LIT_SURFACEDATA_THICKNESS_MULTIPLIER:
+            result = surfacedata.thicknessMultiplier.xxx;
             break;
         case DEBUGVIEW_LIT_SURFACEDATA_TRANSMITTANCE_COLOR:
             result = surfacedata.transmittanceColor;
@@ -305,6 +312,9 @@ void GetGeneratedBSDFDataDebug(uint paramId, BSDFData bsdfdata, inout float3 res
             break;
         case DEBUGVIEW_LIT_BSDFDATA_AT_DISTANCE:
             result = bsdfdata.atDistance.xxx;
+            break;
+        case DEBUGVIEW_LIT_BSDFDATA_THICKNESS_MULTIPLIER:
+            result = bsdfdata.thicknessMultiplier.xxx;
             break;
     }
 }

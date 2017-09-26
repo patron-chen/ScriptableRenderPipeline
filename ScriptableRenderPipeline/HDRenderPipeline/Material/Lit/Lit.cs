@@ -97,6 +97,8 @@ namespace UnityEngine.Experimental.Rendering.HDPipeline
             [SurfaceDataAttributes("Indice of refraction")]
             public float ior;
             // Reuse thickness from SSS
+            [SurfaceDataAttributes("Thickness multiplier")]
+            public float thicknessMultiplier;
             [SurfaceDataAttributes("Transmittance Color")]
             public Vector3 transmittanceColor;
             [SurfaceDataAttributes("Transmittance Absorption Distance")]
@@ -166,6 +168,7 @@ namespace UnityEngine.Experimental.Rendering.HDPipeline
             // Reuse thickness from SSS
             public Vector3 transmittanceColor;
             public float atDistance;
+            public float thicknessMultiplier;
         };
 
         //-----------------------------------------------------------------------------

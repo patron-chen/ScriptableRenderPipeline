@@ -29,6 +29,7 @@ namespace UnityEditor.Experimental.Rendering.HDPipeline
             public static GUIContent roughRefractionEnableText = new GUIContent("Rough Refraction", "Enable rough refraction on this shader"); 
             public static GUIContent transmittanceColorText = new GUIContent("Transmittance Color", "Absorption color (RGB)");
             public static GUIContent atDistanceText = new GUIContent("Transmittance Absorption Distance", "Absorption distance reference");
+            public static GUIContent thicknessMultiplierText = new GUIContent("Thickness multiplier", "Thickness multiplier");
             public static GUIContent roughRefractionThicknessText = new GUIContent("Rough Refraction Thickness", "Thickness for rough refraction");
             public static GUIContent roughRefractionIORText = new GUIContent("Indice of refraction", "Indice of refraction");
 
@@ -77,6 +78,8 @@ namespace UnityEditor.Experimental.Rendering.HDPipeline
         protected const string kTransmittanceColor = "_TransmittanceColor";
         protected MaterialProperty atDistance = null;
         protected const string kATDistance = "_ATDistance";
+        protected MaterialProperty thicknessMultiplier = null;
+        protected const string kThicknessMultiplier = "_ThicknessMultiplier";
         protected MaterialProperty refractionThickness = null;
         protected const string kRoughRefractionThickness = "_Thickness"; // Same as SSS thickness
 
@@ -105,6 +108,7 @@ namespace UnityEditor.Experimental.Rendering.HDPipeline
             roughRefractionEnable = FindProperty(kRoughRefractionEnable, props, false);
             transmittanceColor = FindProperty(kTransmittanceColor, props, false);
             atDistance = FindProperty(kATDistance, props, false);
+            thicknessMultiplier = FindProperty(kThicknessMultiplier, props, false);
             ior = FindProperty(kIOR, props, false);
             refractionThickness = FindProperty(kRoughRefractionThickness, props, false);
         }
@@ -170,6 +174,7 @@ namespace UnityEditor.Experimental.Rendering.HDPipeline
                     {
                         m_MaterialEditor.ShaderProperty(ior, StylesBaseUnlit.roughRefractionIORText);
                         m_MaterialEditor.ShaderProperty(refractionThickness, StylesBaseUnlit.roughRefractionThicknessText);
+                        m_MaterialEditor.ShaderProperty(thicknessMultiplier, StylesBaseUnlit.thicknessMultiplierText);
                         m_MaterialEditor.ShaderProperty(transmittanceColor, StylesBaseUnlit.transmittanceColorText);
                         m_MaterialEditor.ShaderProperty(atDistance, StylesBaseUnlit.atDistanceText);
                     }

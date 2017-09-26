@@ -174,7 +174,7 @@ Material:
     - _HeightMin: -1
     - _HeightScale: 1
     - _HorizonFade: 1
-    - _IOR: 1.5
+    - _IOR: 3
     - _InitialBend: 1
     - _MaterialID: 1
     - _Metalic: 1
@@ -203,7 +203,8 @@ Material:
     - _SubsurfaceRadius: 1
     - _SurfaceType: 1
     - _TexWorldScale: 1
-    - _Thickness: 0.094
+    - _Thickness: 1
+    - _ThicknessMultiplier: 1e+11
     - _UVBase: 0
     - _UVDetail: 0
     - _UVMappingPlanar: 0
