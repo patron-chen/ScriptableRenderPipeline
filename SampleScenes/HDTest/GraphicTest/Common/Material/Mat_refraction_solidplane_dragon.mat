@@ -175,7 +175,7 @@ Material:
     - _HeightMin: -1
     - _HeightScale: 1
     - _HorizonFade: 1
-    - _IOR: 1.224
+    - _IOR: 1.152
     - _InitialBend: 1
     - _MaterialID: 1
     - _Metalic: 1

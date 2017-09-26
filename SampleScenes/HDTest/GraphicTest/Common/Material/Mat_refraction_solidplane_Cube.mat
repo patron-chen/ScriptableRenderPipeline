@@ -6,7 +6,7 @@ Material:
   m_ObjectHideFlags: 0
   m_PrefabParentObject: {fileID: 0}
   m_PrefabInternal: {fileID: 0}
-  m_Name: Mat_refraction_solidplane_Sphere
+  m_Name: Mat_refraction_solidplane_Cube
   m_Shader: {fileID: 4800000, guid: 6e4ae4064600d784cac1e41a9e6f2e59, type: 3}
   m_ShaderKeywords: _BLENDMODE_LERP _MASKMAP _NORMALMAP_TANGENT_SPACE _ROUGH_REFRACTION
     _ROUGH_REFRACTION_ON
@@ -175,7 +175,7 @@ Material:
     - _HeightMin: -1
     - _HeightScale: 1
     - _HorizonFade: 1
-    - _IOR: 1.174
+    - _IOR: 1.261
     - _InitialBend: 1
     - _MaterialID: 1
     - _Metalic: 1
