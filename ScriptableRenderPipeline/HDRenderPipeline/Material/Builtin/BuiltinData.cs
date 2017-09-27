@@ -78,15 +78,5 @@ namespace UnityEngine.Experimental.Rendering.HDPipeline
         {
             return RenderTextureReadWrite.Linear;
         }
-
-        public static RenderTextureFormat GetGaussianPyramidBufferFormat()
-        {
-            return RenderTextureFormat.ARGBHalf;
-        }
-
-        public static RenderTextureReadWrite GetGaussianPyramidBufferReadWrite()
-        {
-            return RenderTextureReadWrite.Linear;
-        }
     }
 }

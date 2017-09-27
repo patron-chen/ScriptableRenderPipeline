@@ -6,7 +6,7 @@ Material:
   m_ObjectHideFlags: 0
   m_PrefabParentObject: {fileID: 0}
   m_PrefabInternal: {fileID: 0}
-  m_Name: Mat_refraction_thinplaneapprox_Sphere
+  m_Name: Mat_refraction_solidsphere_Sphere
   m_Shader: {fileID: 4800000, guid: 6e4ae4064600d784cac1e41a9e6f2e59, type: 3}
   m_ShaderKeywords: _BLENDMODE_LERP _NORMALMAP_TANGENT_SPACE _ROUGH_REFRACTION _ROUGH_REFRACTION_ON
   m_LightmapFlags: 1
@@ -174,7 +174,7 @@ Material:
     - _HeightMin: -1
     - _HeightScale: 1
     - _HorizonFade: 1
-    - _IOR: 1.239
+    - _IOR: 1.5
     - _InitialBend: 1
     - _MaterialID: 1
     - _Metalic: 1
@@ -187,6 +187,7 @@ Material:
     - _PPDMaxSamples: 15
     - _PPDMinSamples: 5
     - _Parallax: 0.02
+    - _RefractionMode: 1
     - _RoughRefractionEnable: 1
     - _ShiverDirectionality: 0.5
     - _ShiverDrag: 0.2
@@ -203,7 +204,7 @@ Material:
     - _SubsurfaceRadius: 1
     - _SurfaceType: 1
     - _TexWorldScale: 1
-    - _Thickness: 0.253
+    - _Thickness: 1
     - _ThicknessMultiplier: 1
     - _UVBase: 0
     - _UVDetail: 0

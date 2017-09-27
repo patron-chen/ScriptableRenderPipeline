@@ -1477,6 +1477,10 @@ void EvaluateBSDF_Area(LightLoopContext lightLoopContext,
 sampler2D _GaussianPyramidColorTexture;
 float4 _GaussianPyramidColorMipSize;
 
+float4 _PyramidDepthMipSize;
+Texture2D _PyramidDepthTexture; 
+SamplerState sampler_PyramidDepthTexture;
+
 void EvaluateBSDF_SSL(  float3 V, PositionInputs posInput, BSDFData bsdfData, out float3 diffuseLighting, out float3 specularLighting, out float2 weight)
 {
     diffuseLighting = float3(0.0, 0.0, 0.0);
@@ -1490,7 +1494,10 @@ void EvaluateBSDF_SSL(  float3 V, PositionInputs posInput, BSDFData bsdfData, ou
             // Solid plane
             // Ray only refact once, like if it solid
             float3 R = refract(-V, bsdfData.normalWS, 1.0 / bsdfData.ior);
-            float distFromP = 20.0;
+
+            float pyramidDepth = _PyramidDepthTexture.SampleLevel(sampler_PyramidDepthTexture, posInput.positionSS, 10.0).r;
+            float depth = LinearEyeDepth(pyramidDepth, _ZBufferParams);
+            float distFromP = depth - posInput.depthVS;
 
             float VoR = dot(-V, R);
             float3 refractedBackPointWS = posInput.positionWS + R*distFromP / VoR;
@@ -1514,7 +1521,9 @@ void EvaluateBSDF_SSL(  float3 V, PositionInputs posInput, BSDFData bsdfData, ou
         {
             // Solid Sphere
             // Approximate locally with a sphere of radius bsdfData.thickness/2 with normal bsdfData.normalWS
-            float depthFromPosition = 20.0;
+            float pyramidDepth = _PyramidDepthTexture.SampleLevel(sampler_PyramidDepthTexture, posInput.positionSS, 10.0).r;
+            float depth = LinearEyeDepth(pyramidDepth, _ZBufferParams);
+            float depthFromPosition = depth - posInput.depthVS;
 
             // Refracted ray within sphere
             float3 R1 = refract(-V, bsdfData.normalWS, 1.0 / bsdfData.ior);
@@ -1554,7 +1563,11 @@ void EvaluateBSDF_SSL(  float3 V, PositionInputs posInput, BSDFData bsdfData, ou
         {
             // thick plane
             float3 R = refract(-V, bsdfData.normalWS, 1.0 / bsdfData.ior);
-            float distFromP = 20.0;
+
+            float pyramidDepth = _PyramidDepthTexture.SampleLevel(sampler_PyramidDepthTexture, posInput.positionSS, 10.0).r;
+            float depth = LinearEyeDepth(pyramidDepth, _ZBufferParams);
+            float distFromP = depth - posInput.depthVS;
+
             float absorptionDistance = bsdfData.thickness / dot(R, -bsdfData.normalWS);
 
             float VoR = dot(-V, R);

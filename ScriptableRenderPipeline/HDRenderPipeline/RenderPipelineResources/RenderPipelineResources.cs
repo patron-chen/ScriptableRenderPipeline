@@ -28,6 +28,8 @@
             instance.subsurfaceScatteringCS = UnityEditor.AssetDatabase.LoadAssetAtPath<ComputeShader>(HDRenderPipelinePath + "Material/Lit/Resources/SubsurfaceScattering.compute");
             instance.volumetricLightingCS = UnityEditor.AssetDatabase.LoadAssetAtPath<ComputeShader>(HDRenderPipelinePath + "Lighting/Volumetrics/Resources/VolumetricLighting.compute");
             instance.gaussianPyramidCS = UnityEditor.AssetDatabase.LoadAssetAtPath<ComputeShader>(PostProcessingPath + "Shaders/Builtins/GaussianDownsample.compute");
+            instance.depthPyramidCS = UnityEditor.AssetDatabase.LoadAssetAtPath<ComputeShader>(HDRenderPipelinePath + "RenderPipelineResources/DepthDownsample.compute");
+
 
             instance.clearDispatchIndirectShader = UnityEditor.AssetDatabase.LoadAssetAtPath<ComputeShader>(HDRenderPipelinePath + "Lighting/TilePass/cleardispatchindirect.compute");
             instance.buildDispatchIndirectShader = UnityEditor.AssetDatabase.LoadAssetAtPath<ComputeShader>(HDRenderPipelinePath + "Lighting/TilePass/builddispatchindirect.compute");
@@ -73,6 +75,7 @@
         public ComputeShader subsurfaceScatteringCS;
         public ComputeShader volumetricLightingCS;
         public ComputeShader gaussianPyramidCS;
+        public ComputeShader depthPyramidCS;
 
         // Lighting tile pass resources
         public ComputeShader clearDispatchIndirectShader;

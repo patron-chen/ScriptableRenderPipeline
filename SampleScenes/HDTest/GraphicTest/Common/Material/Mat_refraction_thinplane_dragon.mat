@@ -188,7 +188,7 @@ Material:
     - _PPDMaxSamples: 15
     - _PPDMinSamples: 5
     - _Parallax: 0.02
-    - _RefractionMode: 1
+    - _RefractionMode: 2
     - _RoughRefractionEnable: 1
     - _ShiverDirectionality: 0.5
     - _ShiverDrag: 0.2
@@ -205,8 +205,8 @@ Material:
     - _SubsurfaceRadius: 1
     - _SurfaceType: 1
     - _TexWorldScale: 1
-    - _Thickness: 0.355
-    - _ThicknessMultiplier: 1
+    - _Thickness: 0.101
+    - _ThicknessMultiplier: 1000
     - _UVBase: 0
     - _UVDetail: 0
     - _UVMappingPlanar: 0
