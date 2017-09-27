@@ -189,10 +189,15 @@ namespace UnityEditor.Experimental.Rendering.HDPipeline
                             refractionMode.floatValue = (float)mode;
                         }
 
-                        if (mode == Lit.RefractionMode.Thick)
+                        switch (mode)
                         {
-                            m_MaterialEditor.ShaderProperty(refractionThickness, StylesBaseUnlit.roughRefractionThicknessText);
-                            m_MaterialEditor.ShaderProperty(thicknessMultiplier, StylesBaseUnlit.thicknessMultiplierText);
+                            case Lit.RefractionMode.ThickPlane:
+                            case Lit.RefractionMode.SolidSphere:
+                            {
+                                m_MaterialEditor.ShaderProperty(refractionThickness, StylesBaseUnlit.roughRefractionThicknessText);
+                                m_MaterialEditor.ShaderProperty(thicknessMultiplier, StylesBaseUnlit.thicknessMultiplierText);
+                                    break;
+                            }
                         }
 
                         m_MaterialEditor.ShaderProperty(transmittanceColor, StylesBaseUnlit.transmittanceColorText);

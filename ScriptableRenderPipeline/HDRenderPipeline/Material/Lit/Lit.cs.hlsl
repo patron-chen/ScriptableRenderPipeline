@@ -32,8 +32,9 @@
 //
 // UnityEngine.Experimental.Rendering.HDPipeline.Lit+RefractionMode:  static fields
 //
-#define REFRACTIONMODE_SOLID (0)
-#define REFRACTIONMODE_THICK (1)
+#define REFRACTIONMODE_SOLID_PLANE (0)
+#define REFRACTIONMODE_SOLID_SPHERE (1)
+#define REFRACTIONMODE_THICK_PLANE (2)
 
 //
 // UnityEngine.Experimental.Rendering.HDPipeline.Lit+SurfaceData:  static fields
@@ -97,7 +98,6 @@
 #define DEBUGVIEW_LIT_BSDFDATA_IOR (1053)
 #define DEBUGVIEW_LIT_BSDFDATA_TRANSMITTANCE_COLOR (1054)
 #define DEBUGVIEW_LIT_BSDFDATA_AT_DISTANCE (1055)
-#define DEBUGVIEW_LIT_BSDFDATA_THICKNESS_MULTIPLIER (1056)
 
 //
 // UnityEngine.Experimental.Rendering.HDPipeline.Lit+GBufferMaterial:  static fields
@@ -162,7 +162,6 @@ struct BSDFData
     float ior;
     float3 transmittanceColor;
     float atDistance;
-    float thicknessMultiplier;
 };
 
 //
@@ -328,9 +327,6 @@ void GetGeneratedBSDFDataDebug(uint paramId, BSDFData bsdfdata, inout float3 res
             break;
         case DEBUGVIEW_LIT_BSDFDATA_AT_DISTANCE:
             result = bsdfdata.atDistance.xxx;
-            break;
-        case DEBUGVIEW_LIT_BSDFDATA_THICKNESS_MULTIPLIER:
-            result = bsdfdata.thicknessMultiplier.xxx;
             break;
     }
 }

@@ -41,8 +41,9 @@ namespace UnityEngine.Experimental.Rendering.HDPipeline
         [GenerateHLSL(PackingRules.Exact)]
         public enum RefractionMode
         {
-            Solid = 0,
-            Thick = 1
+            SolidPlane = 0,
+            SolidSphere = 1,
+            ThickPlane = 2
         };
 
         //-----------------------------------------------------------------------------
@@ -178,7 +179,6 @@ namespace UnityEngine.Experimental.Rendering.HDPipeline
             // Reuse thickness from SSS
             public Vector3 transmittanceColor;
             public float atDistance;
-            public float thicknessMultiplier;
         };
 
         //-----------------------------------------------------------------------------

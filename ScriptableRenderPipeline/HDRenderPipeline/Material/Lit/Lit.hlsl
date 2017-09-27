@@ -314,9 +314,8 @@ BSDFData ConvertSurfaceDataToBSDFData(SurfaceData surfaceData)
     bsdfData.ior = surfaceData.ior;
     bsdfData.transmittanceColor = surfaceData.transmittanceColor;
     bsdfData.atDistance = surfaceData.atDistance;
-    bsdfData.thicknessMultiplier = surfaceData.thicknessMultiplier;
-    bsdfData.thickness = surfaceData.thickness; // TODO: it may override SSS's parameter
     bsdfData.refractionMode = surfaceData.refractionMode;
+    bsdfData.thickness = surfaceData.thickness * surfaceData.thicknessMultiplier;
 
     // IMPORTANT: In case of foward or gbuffer pass we must know what we are statically, so compiler can do compile time optimization
     if (bsdfData.materialId == MATERIALID_LIT_STANDARD)
@@ -345,6 +344,7 @@ BSDFData ConvertSurfaceDataToBSDFData(SurfaceData surfaceData)
         FillMaterialIdStandardData(surfaceData.baseColor, surfaceData.metallic, bsdfData);
         FillMaterialIdClearCoatData(surfaceData.coatNormalWS, surfaceData.coatCoverage, surfaceData.coatIOR, bsdfData);
     }
+
 
     return bsdfData;
 }
@@ -1485,11 +1485,11 @@ void EvaluateBSDF_SSL(  float3 V, PositionInputs posInput, BSDFData bsdfData, ou
 
     if (bsdfData.enableRoughRefraction)
     {
-        if (bsdfData.refractionMode == 0.0)
+        if (bsdfData.refractionMode == REFRACTIONMODE_SOLID_PLANE)
         {
             // Solid plane
             // Ray only refact once, like if it solid
-            float3 R = refract(-V, bsdfData.normalWS, 1.0/bsdfData.ior);
+            float3 R = refract(-V, bsdfData.normalWS, 1.0 / bsdfData.ior);
             float distFromP = 20.0;
 
             float VoR = dot(-V, R);
@@ -1510,14 +1510,52 @@ void EvaluateBSDF_SSL(  float3 V, PositionInputs posInput, BSDFData bsdfData, ou
             diffuseLighting = c;
             weight.x = 1.0;
         }
-        else if (bsdfData.refractionMode == 1.0)
+        else if (bsdfData.refractionMode == REFRACTIONMODE_SOLID_SPHERE)
+        {
+            // Solid Sphere
+            // Approximate locally with a sphere of radius bsdfData.thickness/2 with normal bsdfData.normalWS
+            float depthFromPosition = 20.0;
+
+            // Refracted ray within sphere
+            float3 R1 = refract(-V, bsdfData.normalWS, 1.0 / bsdfData.ior);
+            // Center of the sphere
+            float3 C = posInput.positionWS - bsdfData.normalWS*bsdfData.thickness*0.5;
+
+            float NoR1 = dot(bsdfData.normalWS, R1);
+            // Out hit point in the sphere
+            float3 P1 = posInput.positionWS - R1*NoR1*bsdfData.thickness;
+            // Out normal
+            float3 N1 = normalize(C - P1);
+            // Out refracted ray
+            float3 R2 = refract(R1, N1, bsdfData.ior);
+            float N1oR2 = dot(N1, R2);
+            float VoR1 = dot(V, R1);
+
+            // Refracted source point
+            float3 refractedBackPointWS = P1 - R2*(depthFromPosition - NoR1*VoR1*bsdfData.thickness) / N1oR2;
+
+            float4 refractedBackPointCS = mul(_ViewProjMatrix, float4(refractedBackPointWS, 1.0));
+            float2 refractedBackPointSS = ComputeScreenSpacePosition(refractedBackPointCS);
+
+            // pixel out of buffer
+            if (refractedBackPointSS.x < 0.0 || refractedBackPointSS.x > 1.0
+                || refractedBackPointSS.y < 0.0 || refractedBackPointSS.y > 1.0)
+            {
+                diffuseLighting = tex2Dlod(_GaussianPyramidColorTexture, float4(posInput.positionSS, 0.0, 0.0)).rgb;
+                return;
+            }
+
+            float3 c = tex2Dlod(_GaussianPyramidColorTexture, float4(refractedBackPointSS.xy, 0.0, 0.0));
+
+            diffuseLighting = c;
+            weight.x = 1.0;
+        }
+        else if (bsdfData.refractionMode == REFRACTIONMODE_THICK_PLANE)
         {
             // thick plane
             float3 R = refract(-V, bsdfData.normalWS, 1.0 / bsdfData.ior);
-            /*float depth = LOAD_TEXTURE2D(_MainDepthTexture, posInput.unPositionSS).x;
-            float3 backPointWS = ComputeWorldSpacePosition(posInput.positionSS, depth, _InvViewProjMatrix);*/
-            float distFromP = 20.0;// length(backPointWS - posInput.positionWS);
-            float absorptionDistance = bsdfData.thickness * bsdfData.thicknessMultiplier / dot(R, -bsdfData.normalWS);
+            float distFromP = 20.0;
+            float absorptionDistance = bsdfData.thickness / dot(R, -bsdfData.normalWS);
 
             float VoR = dot(-V, R);
             float VoN = dot(V, bsdfData.normalWS);
