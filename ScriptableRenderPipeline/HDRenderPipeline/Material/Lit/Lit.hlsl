@@ -1492,6 +1492,9 @@ void EvaluateBSDF_SSL(  float3 V, PositionInputs posInput, BSDFData bsdfData, ou
     {
         weight.x = 1.0;
 
+        float3 refractedBackPointWS = float3(0.0, 0.0, 0.0);
+        bool refractedPointFound = false;
+
         if (bsdfData.refractionMode == REFRACTIONMODE_SOLID_PLANE)
         {
             // Solid plane
@@ -1503,23 +1506,8 @@ void EvaluateBSDF_SSL(  float3 V, PositionInputs posInput, BSDFData bsdfData, ou
             float distFromP = depth - posInput.depthVS;
 
             float VoR = dot(-V, R);
-            float3 refractedBackPointWS = posInput.positionWS + R*distFromP / VoR;
-            float4 refractedBackPointCS = mul(_ViewProjMatrix, float4(refractedBackPointWS, 1.0));
-            float2 refractedBackPointSS = ComputeScreenSpacePosition(refractedBackPointCS);
-            float refractedBackPointDepth = LinearEyeDepth(_PyramidDepthTexture.SampleLevel(sampler_PyramidDepthTexture, refractedBackPointSS, 0.0).r, _ZBufferParams);
-
-            // pixel out of buffer
-            // Refracted point is in front of current object
-            if (refractedBackPointDepth < posInput.depthVS
-                || refractedBackPointSS.x < 0.0 || refractedBackPointSS.x > 1.0
-                || refractedBackPointSS.y < 0.0 || refractedBackPointSS.y > 1.0)
-            {
-                diffuseLighting = _GaussianPyramidColorTexture.SampleLevel(sampler_GaussianPyramidColorTexture, posInput.positionSS, 0.0).rgb;
-                return;
-            }
-
-            float mipLevel = PerceptualRoughnessToMipmapLevel(bsdfData.perceptualRoughness);
-            diffuseLighting = _GaussianPyramidColorTexture.SampleLevel(sampler_GaussianPyramidColorTexture, refractedBackPointSS.xy, mipLevel);
+            refractedBackPointWS = posInput.positionWS + R*distFromP / VoR;
+            refractedPointFound = true;
         }
         else if (bsdfData.refractionMode == REFRACTIONMODE_SOLID_SPHERE)
         {
@@ -1545,23 +1533,8 @@ void EvaluateBSDF_SSL(  float3 V, PositionInputs posInput, BSDFData bsdfData, ou
             float VoR1 = dot(V, R1);
 
             // Refracted source point
-            float3 refractedBackPointWS = P1 - R2*(depthFromPosition - NoR1*VoR1*bsdfData.thickness) / N1oR2;
-            float4 refractedBackPointCS = mul(_ViewProjMatrix, float4(refractedBackPointWS, 1.0));
-            float2 refractedBackPointSS = ComputeScreenSpacePosition(refractedBackPointCS);
-            float refractedBackPointDepth = LinearEyeDepth(_PyramidDepthTexture.SampleLevel(sampler_PyramidDepthTexture, refractedBackPointSS, 0.0).r, _ZBufferParams);
-
-            // pixel out of buffer
-            // Refracted point is in front of current object
-            if (refractedBackPointDepth < posInput.depthVS
-                || refractedBackPointSS.x < 0.0 || refractedBackPointSS.x > 1.0
-                || refractedBackPointSS.y < 0.0 || refractedBackPointSS.y > 1.0)
-            {
-                diffuseLighting = _GaussianPyramidColorTexture.SampleLevel(sampler_GaussianPyramidColorTexture, posInput.positionSS, 0.0).rgb;
-                return;
-            }
-
-            float mipLevel = PerceptualRoughnessToMipmapLevel(bsdfData.perceptualRoughness);
-            diffuseLighting = _GaussianPyramidColorTexture.SampleLevel(sampler_GaussianPyramidColorTexture, refractedBackPointSS.xy, mipLevel);
+            refractedBackPointWS = P1 - R2*(depthFromPosition - NoR1*VoR1*bsdfData.thickness) / N1oR2;
+            refractedPointFound = true;
         }
         else if (bsdfData.refractionMode == REFRACTIONMODE_THICK_PLANE)
         {
@@ -1576,24 +1549,32 @@ void EvaluateBSDF_SSL(  float3 V, PositionInputs posInput, BSDFData bsdfData, ou
 
             float VoR = dot(-V, R);
             float VoN = dot(V, bsdfData.normalWS);
-            float3 refractedBackPointWS = posInput.positionWS + R*absorptionDistance - V*(distFromP - VoR*absorptionDistance);
-            float4 refractedBackPointCS = mul(_ViewProjMatrix, float4(refractedBackPointWS, 1.0));
-            float2 refractedBackPointSS = ComputeScreenSpacePosition(refractedBackPointCS);
-            float refractedBackPointDepth = LinearEyeDepth(_PyramidDepthTexture.SampleLevel(sampler_PyramidDepthTexture, refractedBackPointSS, 0.0).r, _ZBufferParams);
-
-            // pixel out of buffer
-            // Refracted point is in front of current object
-            if (refractedBackPointDepth < posInput.depthVS
-                || refractedBackPointSS.x < 0.0 || refractedBackPointSS.x > 1.0
-                || refractedBackPointSS.y < 0.0 || refractedBackPointSS.y > 1.0)
-            {
-                diffuseLighting = _GaussianPyramidColorTexture.SampleLevel(sampler_GaussianPyramidColorTexture, posInput.positionSS, 0.0).rgb;
-                return;
-            }
-
-            float mipLevel = PerceptualRoughnessToMipmapLevel(bsdfData.perceptualRoughness);
-            diffuseLighting = _GaussianPyramidColorTexture.SampleLevel(sampler_GaussianPyramidColorTexture, refractedBackPointSS.xy, mipLevel);
+            refractedBackPointWS = posInput.positionWS + R*absorptionDistance - V*(distFromP - VoR*absorptionDistance);
+            refractedPointFound = true;
         }
+
+        if (!refractedPointFound)
+        {
+            diffuseLighting = _GaussianPyramidColorTexture.SampleLevel(sampler_GaussianPyramidColorTexture, posInput.positionSS, 0.0).rgb;
+            return;
+        }
+
+        float4 refractedBackPointCS = mul(_ViewProjMatrix, float4(refractedBackPointWS, 1.0));
+        float2 refractedBackPointSS = ComputeScreenSpacePosition(refractedBackPointCS);
+        float refractedBackPointDepth = LinearEyeDepth(_PyramidDepthTexture.SampleLevel(sampler_PyramidDepthTexture, refractedBackPointSS, 0.0).r, _ZBufferParams);
+
+        // pixel out of buffer
+        // Refracted point is in front of current object
+        if (refractedBackPointDepth < posInput.depthVS
+            || refractedBackPointSS.x < 0.0 || refractedBackPointSS.x > 1.0
+            || refractedBackPointSS.y < 0.0 || refractedBackPointSS.y > 1.0)
+        {
+            diffuseLighting = _GaussianPyramidColorTexture.SampleLevel(sampler_GaussianPyramidColorTexture, posInput.positionSS, 0.0).rgb;
+            return;
+        }
+
+        float mipLevel = PerceptualRoughnessToMipmapLevel(bsdfData.perceptualRoughness);
+        diffuseLighting = _GaussianPyramidColorTexture.SampleLevel(sampler_GaussianPyramidColorTexture, refractedBackPointSS.xy, mipLevel);
     }
 }
 

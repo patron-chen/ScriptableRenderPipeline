@@ -10,9 +10,6 @@ CBUFFER_START(cb)
     float4 _Size;
 CBUFFER_END
 
-// 16x16 pixels with an 8x8 center that we will be blurring writing out.
-groupshared float gs_cacheD[256];
-
 #pragma kernel KCopy
 [numthreads(8, 8, 1)]
 void KCopy(uint2 groupId : SV_GroupID, uint2 groupThreadId : SV_GroupThreadID, uint2 dispatchThreadId : SV_DispatchThreadID)
