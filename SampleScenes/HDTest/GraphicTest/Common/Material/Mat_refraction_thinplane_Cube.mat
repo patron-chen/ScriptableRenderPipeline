@@ -205,7 +205,7 @@ Material:
     - _SubsurfaceRadius: 1
     - _SurfaceType: 1
     - _TexWorldScale: 1
-    - _Thickness: 0.529
+    - _Thickness: 0.899
     - _ThicknessMultiplier: 1000
     - _UVBase: 0
     - _UVDetail: 0
