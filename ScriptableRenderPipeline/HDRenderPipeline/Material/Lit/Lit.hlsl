@@ -1518,7 +1518,8 @@ void EvaluateBSDF_SSL(  float3 V, PositionInputs posInput, BSDFData bsdfData, ou
                 return;
             }
 
-            diffuseLighting = _GaussianPyramidColorTexture.SampleLevel(sampler_GaussianPyramidColorTexture, refractedBackPointSS.xy, 0.0);
+            float mipLevel = PerceptualRoughnessToMipmapLevel(bsdfData.perceptualRoughness);
+            diffuseLighting = _GaussianPyramidColorTexture.SampleLevel(sampler_GaussianPyramidColorTexture, refractedBackPointSS.xy, mipLevel);
         }
         else if (bsdfData.refractionMode == REFRACTIONMODE_SOLID_SPHERE)
         {
@@ -1559,7 +1560,8 @@ void EvaluateBSDF_SSL(  float3 V, PositionInputs posInput, BSDFData bsdfData, ou
                 return;
             }
 
-            diffuseLighting  = _GaussianPyramidColorTexture.SampleLevel(sampler_GaussianPyramidColorTexture, refractedBackPointSS.xy, 0.0);
+            float mipLevel = PerceptualRoughnessToMipmapLevel(bsdfData.perceptualRoughness);
+            diffuseLighting = _GaussianPyramidColorTexture.SampleLevel(sampler_GaussianPyramidColorTexture, refractedBackPointSS.xy, mipLevel);
         }
         else if (bsdfData.refractionMode == REFRACTIONMODE_THICK_PLANE)
         {
@@ -1589,7 +1591,8 @@ void EvaluateBSDF_SSL(  float3 V, PositionInputs posInput, BSDFData bsdfData, ou
                 return;
             }
 
-            diffuseLighting = _GaussianPyramidColorTexture.SampleLevel(sampler_GaussianPyramidColorTexture, refractedBackPointSS.xy, 0.0);
+            float mipLevel = PerceptualRoughnessToMipmapLevel(bsdfData.perceptualRoughness);
+            diffuseLighting = _GaussianPyramidColorTexture.SampleLevel(sampler_GaussianPyramidColorTexture, refractedBackPointSS.xy, mipLevel);
         }
     }
 }
