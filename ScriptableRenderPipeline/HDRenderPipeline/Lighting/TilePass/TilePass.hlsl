@@ -1,4 +1,4 @@
-#include "TilePass.cs.hlsl"
+﻿#include "TilePass.cs.hlsl"
 
 StructuredBuffer<uint> g_vLightListGlobal;      // don't support Buffer yet in unity
 
@@ -94,6 +94,8 @@ struct LightLoopAccumulatedLighting
 
     float3 envDiffuseLighting;
     float3 envSpecularLighting;
+
+    float envDiffuseLightingWeight;
 };
 
 //-----------------------------------------------------------------------------

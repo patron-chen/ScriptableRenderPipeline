@@ -1474,7 +1474,8 @@ void EvaluateBSDF_Area(LightLoopContext lightLoopContext,
 // EvaluateBSDF_SSL
 // ----------------------------------------------------------------------------
 
-sampler2D _GaussianPyramidColorTexture;
+Texture2D _GaussianPyramidColorTexture;
+SamplerState sampler_GaussianPyramidColorTexture;
 float4 _GaussianPyramidColorMipSize;
 
 float4 _PyramidDepthMipSize;
@@ -1489,6 +1490,8 @@ void EvaluateBSDF_SSL(  float3 V, PositionInputs posInput, BSDFData bsdfData, ou
 
     if (bsdfData.enableRoughRefraction)
     {
+        weight.x = 1.0;
+
         if (bsdfData.refractionMode == REFRACTIONMODE_SOLID_PLANE)
         {
             // Solid plane
@@ -1511,14 +1514,11 @@ void EvaluateBSDF_SSL(  float3 V, PositionInputs posInput, BSDFData bsdfData, ou
                 || refractedBackPointSS.x < 0.0 || refractedBackPointSS.x > 1.0
                 || refractedBackPointSS.y < 0.0 || refractedBackPointSS.y > 1.0)
             {
-                diffuseLighting = tex2Dlod(_GaussianPyramidColorTexture, float4(posInput.positionSS, 0.0, 0.0)).rgb;
+                diffuseLighting = _GaussianPyramidColorTexture.SampleLevel(sampler_GaussianPyramidColorTexture, posInput.positionSS, 0.0).rgb;
                 return;
             }
 
-            float3 c = tex2Dlod(_GaussianPyramidColorTexture, float4(refractedBackPointSS.xy, 0.0, 0.0));
-
-            diffuseLighting = c;
-            weight.x = 1.0;
+            diffuseLighting = _GaussianPyramidColorTexture.SampleLevel(sampler_GaussianPyramidColorTexture, refractedBackPointSS.xy, 0.0);
         }
         else if (bsdfData.refractionMode == REFRACTIONMODE_SOLID_SPHERE)
         {
@@ -1555,14 +1555,11 @@ void EvaluateBSDF_SSL(  float3 V, PositionInputs posInput, BSDFData bsdfData, ou
                 || refractedBackPointSS.x < 0.0 || refractedBackPointSS.x > 1.0
                 || refractedBackPointSS.y < 0.0 || refractedBackPointSS.y > 1.0)
             {
-                diffuseLighting = tex2Dlod(_GaussianPyramidColorTexture, float4(posInput.positionSS, 0.0, 0.0)).rgb;
+                diffuseLighting = _GaussianPyramidColorTexture.SampleLevel(sampler_GaussianPyramidColorTexture, posInput.positionSS, 0.0).rgb;
                 return;
             }
 
-            float3 c = tex2Dlod(_GaussianPyramidColorTexture, float4(refractedBackPointSS.xy, 0.0, 0.0));
-
-            diffuseLighting = c;
-            weight.x = 1.0;
+            diffuseLighting  = _GaussianPyramidColorTexture.SampleLevel(sampler_GaussianPyramidColorTexture, refractedBackPointSS.xy, 0.0);
         }
         else if (bsdfData.refractionMode == REFRACTIONMODE_THICK_PLANE)
         {
@@ -1588,14 +1585,11 @@ void EvaluateBSDF_SSL(  float3 V, PositionInputs posInput, BSDFData bsdfData, ou
                 || refractedBackPointSS.x < 0.0 || refractedBackPointSS.x > 1.0
                 || refractedBackPointSS.y < 0.0 || refractedBackPointSS.y > 1.0)
             {
-                diffuseLighting = tex2Dlod(_GaussianPyramidColorTexture, float4(posInput.positionSS, 0.0, 0.0)).rgb;
+                diffuseLighting = _GaussianPyramidColorTexture.SampleLevel(sampler_GaussianPyramidColorTexture, posInput.positionSS, 0.0).rgb;
                 return;
             }
 
-            float3 c = tex2Dlod(_GaussianPyramidColorTexture, float4(refractedBackPointSS.xy, 0.0, 0.0));
-
-            diffuseLighting = c;
-            weight.x = 1.0;
+            diffuseLighting = _GaussianPyramidColorTexture.SampleLevel(sampler_GaussianPyramidColorTexture, refractedBackPointSS.xy, 0.0);
         }
     }
 }
@@ -1754,7 +1748,7 @@ void PostEvaluateBSDF(  LightLoopContext lightLoopContext, PreLightData preLight
     // TODO: we could call a function like PostBSDF that will apply albedo and divide by PI once for the loop
 
     // envDiffuseLighting is used for refraction
-    diffuseLighting = accLighting.envDiffuseLighting + (accLighting.dirDiffuseLighting + accLighting.punctualDiffuseLighting + accLighting.areaDiffuseLighting) * GTAOMultiBounce(lightLoopContext.directAmbientOcclusion, bsdfData.diffuseColor) + bakeDiffuseLighting;
+    diffuseLighting = accLighting.envDiffuseLighting * accLighting.envDiffuseLightingWeight + (1.0 - accLighting.envDiffuseLightingWeight) * (accLighting.dirDiffuseLighting + accLighting.punctualDiffuseLighting + accLighting.areaDiffuseLighting) * GTAOMultiBounce(lightLoopContext.directAmbientOcclusion, bsdfData.diffuseColor) + bakeDiffuseLighting;
     specularLighting = accLighting.dirSpecularLighting + accLighting.punctualSpecularLighting + accLighting.areaSpecularLighting + accLighting.envSpecularLighting;
 }
 

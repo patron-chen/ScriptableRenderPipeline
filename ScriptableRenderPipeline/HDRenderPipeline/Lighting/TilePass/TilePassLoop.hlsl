@@ -300,6 +300,7 @@ void LightLoop( float3 V, PositionInputs posInput, PreLightData preLightData, BS
         float2 weight;
         EvaluateBSDF_SSL(V, posInput, bsdfData, localDiffuseLighting, localSpecularLighting, weight);
         applyWeigthedIblLighting(localDiffuseLighting, localSpecularLighting, weight, accLighting.envDiffuseLighting, accLighting.envSpecularLighting, totalIblWeight);
+        accLighting.envDiffuseLightingWeight = weight.x;
     }
 
     if (featureFlags & LIGHTFEATUREFLAGS_ENV || featureFlags & LIGHTFEATUREFLAGS_SKY)
