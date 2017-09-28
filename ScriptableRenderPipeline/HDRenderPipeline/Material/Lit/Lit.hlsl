@@ -1493,6 +1493,7 @@ void EvaluateBSDF_SSL(  float3 V, PositionInputs posInput, BSDFData bsdfData, ou
         weight.x = 1.0;
 
         float3 refractedBackPointWS = float3(0.0, 0.0, 0.0);
+        float opticalDepth = 0.0;
         bool refractedPointFound = false;
 
         if (bsdfData.refractionMode == REFRACTIONMODE_SOLID_PLANE)
@@ -1507,6 +1508,7 @@ void EvaluateBSDF_SSL(  float3 V, PositionInputs posInput, BSDFData bsdfData, ou
 
             float VoR = dot(-V, R);
             refractedBackPointWS = posInput.positionWS + R*distFromP / VoR;
+            opticalDepth = bsdfData.thickness;
             refractedPointFound = true;
         }
         else if (bsdfData.refractionMode == REFRACTIONMODE_SOLID_SPHERE)
@@ -1524,7 +1526,8 @@ void EvaluateBSDF_SSL(  float3 V, PositionInputs posInput, BSDFData bsdfData, ou
 
             float NoR1 = dot(bsdfData.normalWS, R1);
             // Out hit point in the sphere
-            float3 P1 = posInput.positionWS - R1*NoR1*bsdfData.thickness;
+            opticalDepth = -NoR1*bsdfData.thickness;
+            float3 P1 = posInput.positionWS + R1*opticalDepth;
             // Out normal
             float3 N1 = normalize(C - P1);
             // Out refracted ray
@@ -1545,11 +1548,11 @@ void EvaluateBSDF_SSL(  float3 V, PositionInputs posInput, BSDFData bsdfData, ou
             float depth = LinearEyeDepth(pyramidDepth, _ZBufferParams);
             float distFromP = depth - posInput.depthVS;
 
-            float absorptionDistance = bsdfData.thickness / dot(R, -bsdfData.normalWS);
+            opticalDepth = bsdfData.thickness / dot(R, -bsdfData.normalWS);
 
             float VoR = dot(-V, R);
             float VoN = dot(V, bsdfData.normalWS);
-            refractedBackPointWS = posInput.positionWS + R*absorptionDistance - V*(distFromP - VoR*absorptionDistance);
+            refractedBackPointWS = posInput.positionWS + R*opticalDepth - V*(distFromP - VoR*opticalDepth);
             refractedPointFound = true;
         }
 
@@ -1575,6 +1578,10 @@ void EvaluateBSDF_SSL(  float3 V, PositionInputs posInput, BSDFData bsdfData, ou
 
         float mipLevel = PerceptualRoughnessToMipmapLevel(bsdfData.perceptualRoughness);
         diffuseLighting = _GaussianPyramidColorTexture.SampleLevel(sampler_GaussianPyramidColorTexture, refractedBackPointSS.xy, mipLevel);
+
+        float3 absorptionCoefficient = -log(bsdfData.transmittanceColor + 0.00001) / bsdfData.atDistance;
+        float3 transmittance = exp(-absorptionCoefficient*opticalDepth);
+        diffuseLighting *= transmittance;
     }
 }
 

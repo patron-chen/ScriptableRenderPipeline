@@ -133,7 +133,7 @@ Material:
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
     m_Floats:
-    - _ATDistance: 0
+    - _ATDistance: 1
     - _AlbedoAffectEmissive: 0
     - _AlphaCutoff: 0.5
     - _AlphaCutoffEnable: 0
@@ -174,7 +174,7 @@ Material:
     - _HeightMin: -1
     - _HeightScale: 1
     - _HorizonFade: 1
-    - _IOR: 1.5
+    - _IOR: 1.3
     - _InitialBend: 1
     - _MaterialID: 1
     - _Metalic: 1
@@ -220,6 +220,6 @@ Material:
     - _EmissiveColor: {r: 0, g: 0, b: 0, a: 1}
     - _RefractionAbsorption: {r: 0, g: 0, b: 0, a: 1}
     - _SpecularColor: {r: 1, g: 1, b: 1, a: 1}
-    - _TransmittanceColor: {r: 0, g: 0, b: 0, a: 1}
+    - _TransmittanceColor: {r: 1, g: 1, b: 1, a: 1}
     - _UVDetailsMappingMask: {r: 1, g: 0, b: 0, a: 0}
     - _UVMappingMask: {r: 1, g: 0, b: 0, a: 0}
