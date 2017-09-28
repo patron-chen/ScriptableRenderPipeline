@@ -1478,7 +1478,7 @@ sampler2D _GaussianPyramidColorTexture;
 float4 _GaussianPyramidColorMipSize;
 
 float4 _PyramidDepthMipSize;
-Texture2D _PyramidDepthTexture; 
+Texture2D _PyramidDepthTexture;
 SamplerState sampler_PyramidDepthTexture;
 
 void EvaluateBSDF_SSL(  float3 V, PositionInputs posInput, BSDFData bsdfData, out float3 diffuseLighting, out float3 specularLighting, out float2 weight)
@@ -1503,9 +1503,12 @@ void EvaluateBSDF_SSL(  float3 V, PositionInputs posInput, BSDFData bsdfData, ou
             float3 refractedBackPointWS = posInput.positionWS + R*distFromP / VoR;
             float4 refractedBackPointCS = mul(_ViewProjMatrix, float4(refractedBackPointWS, 1.0));
             float2 refractedBackPointSS = ComputeScreenSpacePosition(refractedBackPointCS);
+            float refractedBackPointDepth = LinearEyeDepth(_PyramidDepthTexture.SampleLevel(sampler_PyramidDepthTexture, refractedBackPointSS, 0.0).r, _ZBufferParams);
 
             // pixel out of buffer
-            if (refractedBackPointSS.x < 0.0 || refractedBackPointSS.x > 1.0
+            // Refracted point is in front of current object
+            if (refractedBackPointDepth < posInput.depthVS
+                || refractedBackPointSS.x < 0.0 || refractedBackPointSS.x > 1.0
                 || refractedBackPointSS.y < 0.0 || refractedBackPointSS.y > 1.0)
             {
                 diffuseLighting = tex2Dlod(_GaussianPyramidColorTexture, float4(posInput.positionSS, 0.0, 0.0)).rgb;
@@ -1542,12 +1545,14 @@ void EvaluateBSDF_SSL(  float3 V, PositionInputs posInput, BSDFData bsdfData, ou
 
             // Refracted source point
             float3 refractedBackPointWS = P1 - R2*(depthFromPosition - NoR1*VoR1*bsdfData.thickness) / N1oR2;
-
             float4 refractedBackPointCS = mul(_ViewProjMatrix, float4(refractedBackPointWS, 1.0));
             float2 refractedBackPointSS = ComputeScreenSpacePosition(refractedBackPointCS);
+            float refractedBackPointDepth = LinearEyeDepth(_PyramidDepthTexture.SampleLevel(sampler_PyramidDepthTexture, refractedBackPointSS, 0.0).r, _ZBufferParams);
 
             // pixel out of buffer
-            if (refractedBackPointSS.x < 0.0 || refractedBackPointSS.x > 1.0
+            // Refracted point is in front of current object
+            if (refractedBackPointDepth < posInput.depthVS
+                || refractedBackPointSS.x < 0.0 || refractedBackPointSS.x > 1.0
                 || refractedBackPointSS.y < 0.0 || refractedBackPointSS.y > 1.0)
             {
                 diffuseLighting = tex2Dlod(_GaussianPyramidColorTexture, float4(posInput.positionSS, 0.0, 0.0)).rgb;
@@ -1575,9 +1580,12 @@ void EvaluateBSDF_SSL(  float3 V, PositionInputs posInput, BSDFData bsdfData, ou
             float3 refractedBackPointWS = posInput.positionWS + R*absorptionDistance - V*(distFromP - VoR*absorptionDistance);
             float4 refractedBackPointCS = mul(_ViewProjMatrix, float4(refractedBackPointWS, 1.0));
             float2 refractedBackPointSS = ComputeScreenSpacePosition(refractedBackPointCS);
+            float refractedBackPointDepth = LinearEyeDepth(_PyramidDepthTexture.SampleLevel(sampler_PyramidDepthTexture, refractedBackPointSS, 0.0).r, _ZBufferParams);
 
             // pixel out of buffer
-            if (refractedBackPointSS.x < 0.0 || refractedBackPointSS.x > 1.0
+            // Refracted point is in front of current object
+            if (refractedBackPointDepth < posInput.depthVS
+                || refractedBackPointSS.x < 0.0 || refractedBackPointSS.x > 1.0
                 || refractedBackPointSS.y < 0.0 || refractedBackPointSS.y > 1.0)
             {
                 diffuseLighting = tex2Dlod(_GaussianPyramidColorTexture, float4(posInput.positionSS, 0.0, 0.0)).rgb;
