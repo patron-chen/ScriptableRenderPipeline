@@ -28,12 +28,12 @@ namespace UnityEditor.Experimental.Rendering.HDPipeline
             public static GUIContent distortionOnlyText = new GUIContent("Distortion Only", "This shader will only be use to render distortion");
             public static GUIContent distortionDepthTestText = new GUIContent("Distortion Depth Test", "Enable the depth test for distortion");
 
-            public static GUIContent roughRefractionEnableText = new GUIContent("Rough Refraction", "Enable rough refraction on this shader"); 
+            public static GUIContent refractionEnableText = new GUIContent("Refraction", "Enable refraction on this shader"); 
             public static GUIContent transmittanceColorText = new GUIContent("Transmittance Color", "Absorption color (RGB)");
             public static GUIContent atDistanceText = new GUIContent("Transmittance Absorption Distance", "Absorption distance reference");
             public static GUIContent thicknessMultiplierText = new GUIContent("Thickness multiplier", "Thickness multiplier"); 
-            public static GUIContent roughRefractionThicknessText = new GUIContent("Rough Refraction Thickness", "Thickness for rough refraction");
-            public static GUIContent roughRefractionIORText = new GUIContent("Indice of refraction", "Indice of refraction");
+            public static GUIContent refractionThicknessText = new GUIContent("Refraction Thickness", "Thickness for rough refraction");
+            public static GUIContent refractionIORText = new GUIContent("Indice of refraction", "Indice of refraction");
             public static string refractionModeText = "Refraction Mode";
 
             public static string advancedText = "Advanced Options";
@@ -73,8 +73,6 @@ namespace UnityEditor.Experimental.Rendering.HDPipeline
         protected const string kDistortionOnly = "_DistortionOnly";
         protected MaterialProperty distortionDepthTest = null;
         protected const string kDistortionDepthTest = "_DistortionDepthTest";
-        protected MaterialProperty roughRefractionEnable = null;
-        protected const string kRoughRefractionEnable = "_RoughRefractionEnable";
         protected MaterialProperty ior = null;
         protected const string kIOR = "_IOR";
         protected MaterialProperty transmittanceColor = null;
@@ -110,7 +108,6 @@ namespace UnityEditor.Experimental.Rendering.HDPipeline
             distortionEnable = FindProperty(kDistortionEnable, props, false);
             distortionOnly = FindProperty(kDistortionOnly, props, false);
             distortionDepthTest = FindProperty(kDistortionDepthTest, props, false);
-            roughRefractionEnable = FindProperty(kRoughRefractionEnable, props, false);
             refractionMode = FindProperty(kRefractionMode, props, false);
             transmittanceColor = FindProperty(kTransmittanceColor, props, false);
             atDistance = FindProperty(kATDistance, props, false);
@@ -173,32 +170,23 @@ namespace UnityEditor.Experimental.Rendering.HDPipeline
                     }
                 }
 
-                if (roughRefractionEnable != null)
+                if (refractionMode != null)
                 {
-                    m_MaterialEditor.ShaderProperty(roughRefractionEnable, StylesBaseUnlit.roughRefractionEnableText);
-                    if (roughRefractionEnable.floatValue == 1.0f)
+                    var mode = (Lit.RefractionMode)refractionMode.floatValue;
+                    EditorGUI.BeginChangeCheck();
+                    mode = (Lit.RefractionMode)EditorGUILayout.Popup(StylesBaseUnlit.refractionModeText, (int)mode, StylesBaseUnlit.refractionModeTypeNames);
+                    if (EditorGUI.EndChangeCheck())
                     {
-                        m_MaterialEditor.ShaderProperty(ior, StylesBaseUnlit.roughRefractionIORText);
+                        m_MaterialEditor.RegisterPropertyChangeUndo("Refraction Mode");
+                        refractionMode.floatValue = (float)mode;
+                    }
 
-                        var mode = (Lit.RefractionMode)refractionMode.floatValue;
-                        EditorGUI.BeginChangeCheck();
-                        mode = (Lit.RefractionMode)EditorGUILayout.Popup(StylesBaseUnlit.refractionModeText, (int)mode, StylesBaseUnlit.refractionModeTypeNames);
-                        if (EditorGUI.EndChangeCheck())
-                        {
-                            m_MaterialEditor.RegisterPropertyChangeUndo("Refraction Mode");
-                            refractionMode.floatValue = (float)mode;
-                        }
+                    if (mode != Lit.RefractionMode.None)
+                    {
+                        m_MaterialEditor.ShaderProperty(ior, StylesBaseUnlit.refractionIORText);
 
-                        switch (mode)
-                        {
-                            case Lit.RefractionMode.ThickPlane:
-                            case Lit.RefractionMode.SolidSphere:
-                            {
-                                m_MaterialEditor.ShaderProperty(refractionThickness, StylesBaseUnlit.roughRefractionThicknessText);
-                                m_MaterialEditor.ShaderProperty(thicknessMultiplier, StylesBaseUnlit.thicknessMultiplierText);
-                                    break;
-                            }
-                        }
+                        m_MaterialEditor.ShaderProperty(refractionThickness, StylesBaseUnlit.refractionThicknessText);
+                        m_MaterialEditor.ShaderProperty(thicknessMultiplier, StylesBaseUnlit.thicknessMultiplierText);
 
                         m_MaterialEditor.ShaderProperty(transmittanceColor, StylesBaseUnlit.transmittanceColorText);
                         m_MaterialEditor.ShaderProperty(atDistance, StylesBaseUnlit.atDistanceText);

@@ -310,7 +310,6 @@ BSDFData ConvertSurfaceDataToBSDFData(SurfaceData surfaceData)
     bsdfData.perceptualRoughness = PerceptualSmoothnessToPerceptualRoughness(surfaceData.perceptualSmoothness);
     bsdfData.roughness = PerceptualRoughnessToRoughness(bsdfData.perceptualRoughness);
     bsdfData.materialId = surfaceData.materialId;
-    bsdfData.enableRoughRefraction = surfaceData.enableRoughRefraction;
     bsdfData.ior = surfaceData.ior;
     bsdfData.transmittanceColor = surfaceData.transmittanceColor;
     bsdfData.atDistance = surfaceData.atDistance;
@@ -1488,7 +1487,7 @@ void EvaluateBSDF_SSL(  float3 V, PositionInputs posInput, BSDFData bsdfData, ou
     specularLighting = float3(0.0, 0.0, 0.0);
     weight = float2(0.0, 0.0);
 
-    if (bsdfData.enableRoughRefraction)
+    if (bsdfData.refractionMode != REFRACTIONMODE_NONE)
     {
         weight.x = 1.0;
 

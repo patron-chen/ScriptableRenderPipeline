@@ -41,9 +41,10 @@ namespace UnityEngine.Experimental.Rendering.HDPipeline
         [GenerateHLSL(PackingRules.Exact)]
         public enum RefractionMode
         {
-            SolidPlane = 0,
-            SolidSphere = 1,
-            ThickPlane = 2
+            None = 0,
+            SolidPlane = 1,
+            SolidSphere = 2,
+            ThickPlane = 3
         };
 
         //-----------------------------------------------------------------------------
@@ -99,9 +100,7 @@ namespace UnityEngine.Experimental.Rendering.HDPipeline
             [SurfaceDataAttributes("Coat IOR")]
             public float coatIOR; // Value is [0..1] for artists but the UI will display the value between [1..2]
 
-            // Rough Refraction
-            [SurfaceDataAttributes("Enable Rough Refraction")]
-            public bool enableRoughRefraction;
+            // Refraction
             [SurfaceDataAttributes("Indice of refraction")]
             public float ior;
             // Reuse thickness from SSS
@@ -172,8 +171,7 @@ namespace UnityEngine.Experimental.Rendering.HDPipeline
             public float coatCoverage;
             public float coatIOR; // CoatIOR is in range[1..2] it is surfaceData + 1
 
-            // Rough Refraction
-            public bool enableRoughRefraction;
+            // Refraction
             public int refractionMode;
             public float ior;
             // Reuse thickness from SSS

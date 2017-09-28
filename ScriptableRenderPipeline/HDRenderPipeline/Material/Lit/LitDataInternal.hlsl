@@ -214,8 +214,7 @@ float ADD_IDX(GetSurfaceData)(FragInputs input, LayerTexCoord layerTexCoord, out
 #endif
     surfaceData.metallic *= ADD_IDX(_Metallic);
 
-#ifdef _ROUGH_REFRACTION_ON
-    surfaceData.enableRoughRefraction = true;
+#ifdef _REFRACTION_ON
     surfaceData.ior = _IOR;
     surfaceData.transmittanceColor = _TransmittanceColor;
     surfaceData.atDistance = _ATDistance;
@@ -223,11 +222,10 @@ float ADD_IDX(GetSurfaceData)(FragInputs input, LayerTexCoord layerTexCoord, out
     surfaceData.refractionMode = _RefractionMode;
     // Thickness already defined
 #else
-    surfaceData.enableRoughRefraction = false;
     surfaceData.ior = 1.0;
-    surfaceData.transmittanceColor = float3(0.0, 0.0, 0.0);
+    surfaceData.transmittanceColor = float3(1.0, 1.0, 1.0);
     surfaceData.atDistance = 1.0;
-    surfaceData.thicknessMultiplier = 1.0;
+    surfaceData.thicknessMultiplier = 1000000.0;
     surfaceData.refractionMode = 0;
 #endif
 

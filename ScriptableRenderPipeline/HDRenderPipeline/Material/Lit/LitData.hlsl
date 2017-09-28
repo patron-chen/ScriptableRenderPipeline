@@ -1369,10 +1369,9 @@ void GetSurfaceAndBuiltinData(FragInputs input, float3 V, inout PositionInputs p
     surfaceData.coatNormalWS = float3(0.0, 0.0, 0.0);
     surfaceData.coatCoverage = 0.0f;
     surfaceData.coatIOR = 0.5;
-    surfaceData.enableRoughRefraction = false;
     surfaceData.ior = 1.0;
-    surfaceData.transmittanceColor = float3(0.0, 0.0, 0.0);
-    surfaceData.atDistance = 1.0;
+    surfaceData.transmittanceColor = float3(1.0, 1.0, 1.0);
+    surfaceData.atDistance = 1000000.0;
     surfaceData.thicknessMultiplier = 1.0;
     surfaceData.refractionMode = 0;
 

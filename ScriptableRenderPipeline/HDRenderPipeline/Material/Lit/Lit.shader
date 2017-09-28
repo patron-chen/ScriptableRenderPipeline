@@ -77,12 +77,11 @@
         [ToggleOff]  _AlphaCutoffEnable("Alpha Cutoff Enable", Float) = 0.0
         _AlphaCutoff("Alpha Cutoff", Range(0.0, 1.0)) = 0.5
 
-        [ToggleOff]  _RoughRefractionEnable("Rough Refraction Enable", Float) = 0.0
-        _IOR("Indice Of Refraction", Range(1.0, 3.0)) = 1.0
-        _TransmittanceColor("Transmittance Color", Color) = (0.0, 0.0, 0.0)
-        _ATDistance("Transmittance Absorption Distance", Float) = 1.0
-        _ThicknessMultiplier("Thickness Multiplier", Float) = 1.0
         [ToggleOff]  _RefractionMode("Refraction Mode", Int) = 0
+        _IOR("Indice Of Refraction", Range(1.0, 3.0)) = 1.0
+        _ThicknessMultiplier("Thickness Multiplier", Float) = 1.0
+        _TransmittanceColor("Transmittance Color", Color) = (1.0, 1.0, 1.0)
+        _ATDistance("Transmittance Absorption Distance", Float) = 1.0
 
         // Stencil state
         [HideInInspector] _StencilRef("_StencilRef", Int) = 2 // StencilLightingUsage.RegularLighting  (fixed at compile time)
@@ -137,7 +136,7 @@
     #pragma shader_feature _DEPTHOFFSET_ON
     #pragma shader_feature _DOUBLESIDED_ON
     #pragma shader_feature _PER_PIXEL_DISPLACEMENT
-    #pragma shader_feature _ROUGH_REFRACTION_ON
+    #pragma shader_feature _REFRACTION_ON
 
     #pragma shader_feature _ _MAPPING_PLANAR _MAPPING_TRIPLANAR
     #pragma shader_feature _NORMALMAP_TANGENT_SPACE

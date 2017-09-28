@@ -32,9 +32,10 @@
 //
 // UnityEngine.Experimental.Rendering.HDPipeline.Lit+RefractionMode:  static fields
 //
-#define REFRACTIONMODE_SOLID_PLANE (0)
-#define REFRACTIONMODE_SOLID_SPHERE (1)
-#define REFRACTIONMODE_THICK_PLANE (2)
+#define REFRACTIONMODE_NONE (0)
+#define REFRACTIONMODE_SOLID_PLANE (1)
+#define REFRACTIONMODE_SOLID_SPHERE (2)
+#define REFRACTIONMODE_THICK_PLANE (3)
 
 //
 // UnityEngine.Experimental.Rendering.HDPipeline.Lit+SurfaceData:  static fields
@@ -55,12 +56,11 @@
 #define DEBUGVIEW_LIT_SURFACEDATA_COAT_NORMAL_WS (1013)
 #define DEBUGVIEW_LIT_SURFACEDATA_COAT_COVERAGE (1014)
 #define DEBUGVIEW_LIT_SURFACEDATA_COAT_IOR (1015)
-#define DEBUGVIEW_LIT_SURFACEDATA_ENABLE_ROUGH_REFRACTION (1016)
-#define DEBUGVIEW_LIT_SURFACEDATA_IOR (1017)
-#define DEBUGVIEW_LIT_SURFACEDATA_THICKNESS_MULTIPLIER (1018)
-#define DEBUGVIEW_LIT_SURFACEDATA_TRANSMITTANCE_COLOR (1019)
-#define DEBUGVIEW_LIT_SURFACEDATA_AT_DISTANCE (1020)
-#define DEBUGVIEW_LIT_SURFACEDATA_REFRACTION_MODE (1021)
+#define DEBUGVIEW_LIT_SURFACEDATA_IOR (1016)
+#define DEBUGVIEW_LIT_SURFACEDATA_THICKNESS_MULTIPLIER (1017)
+#define DEBUGVIEW_LIT_SURFACEDATA_TRANSMITTANCE_COLOR (1018)
+#define DEBUGVIEW_LIT_SURFACEDATA_AT_DISTANCE (1019)
+#define DEBUGVIEW_LIT_SURFACEDATA_REFRACTION_MODE (1020)
 
 //
 // UnityEngine.Experimental.Rendering.HDPipeline.Lit+TransmissionType:  static fields
@@ -93,11 +93,10 @@
 #define DEBUGVIEW_LIT_BSDFDATA_COAT_NORMAL_WS (1048)
 #define DEBUGVIEW_LIT_BSDFDATA_COAT_COVERAGE (1049)
 #define DEBUGVIEW_LIT_BSDFDATA_COAT_IOR (1050)
-#define DEBUGVIEW_LIT_BSDFDATA_ENABLE_ROUGH_REFRACTION (1051)
-#define DEBUGVIEW_LIT_BSDFDATA_REFRACTION_MODE (1052)
-#define DEBUGVIEW_LIT_BSDFDATA_IOR (1053)
-#define DEBUGVIEW_LIT_BSDFDATA_TRANSMITTANCE_COLOR (1054)
-#define DEBUGVIEW_LIT_BSDFDATA_AT_DISTANCE (1055)
+#define DEBUGVIEW_LIT_BSDFDATA_REFRACTION_MODE (1051)
+#define DEBUGVIEW_LIT_BSDFDATA_IOR (1052)
+#define DEBUGVIEW_LIT_BSDFDATA_TRANSMITTANCE_COLOR (1053)
+#define DEBUGVIEW_LIT_BSDFDATA_AT_DISTANCE (1054)
 
 //
 // UnityEngine.Experimental.Rendering.HDPipeline.Lit+GBufferMaterial:  static fields
@@ -124,7 +123,6 @@ struct SurfaceData
     float3 coatNormalWS;
     float coatCoverage;
     float coatIOR;
-    bool enableRoughRefraction;
     float ior;
     float thicknessMultiplier;
     float3 transmittanceColor;
@@ -157,7 +155,6 @@ struct BSDFData
     float3 coatNormalWS;
     float coatCoverage;
     float coatIOR;
-    bool enableRoughRefraction;
     int refractionMode;
     float ior;
     float3 transmittanceColor;
@@ -220,9 +217,6 @@ void GetGeneratedSurfaceDataDebug(uint paramId, SurfaceData surfacedata, inout f
             break;
         case DEBUGVIEW_LIT_SURFACEDATA_COAT_IOR:
             result = surfacedata.coatIOR.xxx;
-            break;
-        case DEBUGVIEW_LIT_SURFACEDATA_ENABLE_ROUGH_REFRACTION:
-            result = (surfacedata.enableRoughRefraction) ? float3(1.0, 1.0, 1.0) : float3(0.0, 0.0, 0.0);
             break;
         case DEBUGVIEW_LIT_SURFACEDATA_IOR:
             result = surfacedata.ior.xxx;
@@ -312,9 +306,6 @@ void GetGeneratedBSDFDataDebug(uint paramId, BSDFData bsdfdata, inout float3 res
             break;
         case DEBUGVIEW_LIT_BSDFDATA_COAT_IOR:
             result = bsdfdata.coatIOR.xxx;
-            break;
-        case DEBUGVIEW_LIT_BSDFDATA_ENABLE_ROUGH_REFRACTION:
-            result = (bsdfdata.enableRoughRefraction) ? float3(1.0, 1.0, 1.0) : float3(0.0, 0.0, 0.0);
             break;
         case DEBUGVIEW_LIT_BSDFDATA_REFRACTION_MODE:
             result = GetIndexColor(bsdfdata.refractionMode);
