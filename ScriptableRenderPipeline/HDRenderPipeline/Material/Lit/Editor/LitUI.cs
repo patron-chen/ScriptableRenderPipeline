@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using UnityEngine;
 using UnityEngine.Rendering;
 using UnityEngine.Experimental.Rendering;
@@ -73,6 +73,16 @@ namespace UnityEditor.Experimental.Rendering.HDPipeline
             public static GUIContent albedoAffectEmissiveText = new GUIContent("Albedo Affect Emissive", "Specifies whether or not the emissive color is multiplied by the albedo.");
 
             public static GUIContent normalMapSpaceWarning = new GUIContent("Object space normal can't be use with triplanar mapping.");
+
+            // Transparency
+            public static string TransparencyInputsText = "Transparency Inputs";
+            public static string refractionModeText = "Refraction Mode";
+            public static GUIContent refractionIORText = new GUIContent("Indice of refraction", "Indice of refraction");
+            public static GUIContent refractionThicknessText = new GUIContent("Refraction Thickness", "Thickness for rough refraction");
+            public static GUIContent thicknessMultiplierText = new GUIContent("Thickness multiplier", "Thickness multiplier");
+            // Transparency absorption
+            public static GUIContent transmittanceColorText = new GUIContent("Transmittance Color", "Absorption color (RGB)");
+            public static GUIContent atDistanceText = new GUIContent("Transmittance Absorption Distance", "Absorption distance reference");
         }
 
         // Lit shader is not layered but some layered materials inherit from it. In order to share code we need LitUI to account for this.
@@ -212,6 +222,18 @@ namespace UnityEditor.Experimental.Rendering.HDPipeline
         protected MaterialProperty enableSpecularOcclusion = null;
         protected const string kEnableSpecularOcclusion = "_EnableSpecularOcclusion";
 
+        // transparency params
+        protected MaterialProperty ior = null;
+        protected const string kIOR = "_IOR";
+        protected MaterialProperty transmittanceColor = null;
+        protected const string kTransmittanceColor = "_TransmittanceColor";
+        protected MaterialProperty atDistance = null;
+        protected const string kATDistance = "_ATDistance";
+        protected MaterialProperty thicknessMultiplier = null;
+        protected const string kThicknessMultiplier = "_ThicknessMultiplier";
+        protected MaterialProperty refractionMode = null;
+        protected const string kRefractionMode = "_RefractionMode";
+
         protected void FindMaterialLayerProperties(MaterialProperty[] props)
         {
             for (int i = 0; i < m_LayerCount; ++i)
@@ -286,6 +308,14 @@ namespace UnityEditor.Experimental.Rendering.HDPipeline
             // clear coat
             coatCoverage = FindProperty(kCoatCoverage, props);
             coatIOR = FindProperty(kCoatIOR, props);
+
+            // Transparency
+            refractionMode = FindProperty(kRefractionMode, props, false);
+            transmittanceColor = FindProperty(kTransmittanceColor, props, false);
+            atDistance = FindProperty(kATDistance, props, false);
+            thicknessMultiplier = FindProperty(kThicknessMultiplier, props, false);
+            ior = FindProperty(kIOR, props, false);
+            // We reuse thickness from SSS
         }
 
         protected void ShaderSSSInputGUI(Material material)
@@ -510,6 +540,34 @@ namespace UnityEditor.Experimental.Rendering.HDPipeline
             m_MaterialEditor.ShaderProperty(detailSmoothnessScale[layerIndex], Styles.detailSmoothnessScaleText);
 
             EditorGUI.indentLevel--;
+
+            EditorGUILayout.Space();
+            EditorGUILayout.LabelField(Styles.TransparencyInputsText, EditorStyles.boldLabel);
+
+            var surfaceTypeValue = (SurfaceType)surfaceType.floatValue;
+            if (surfaceTypeValue == SurfaceType.Transparent 
+                && refractionMode != null)
+            {
+                m_MaterialEditor.ShaderProperty(refractionMode, Styles.refractionModeText);
+                var mode = (Lit.RefractionMode)refractionMode.floatValue;
+                if (mode != Lit.RefractionMode.None)
+                {
+                    m_MaterialEditor.ShaderProperty(ior, Styles.refractionIORText);
+
+                    if (thicknessMap.textureValue == null)
+                        m_MaterialEditor.ShaderProperty(thickness, Styles.refractionThicknessText);
+                    m_MaterialEditor.TexturePropertySingleLine(Styles.thicknessMapText, thicknessMap);
+
+                    ++EditorGUI.indentLevel;
+                    m_MaterialEditor.ShaderProperty(thicknessMultiplier, Styles.thicknessMultiplierText);
+                    --EditorGUI.indentLevel;
+
+                    m_MaterialEditor.ShaderProperty(transmittanceColor, Styles.transmittanceColorText);
+                    ++EditorGUI.indentLevel;
+                    m_MaterialEditor.ShaderProperty(atDistance, Styles.atDistanceText);
+                    --EditorGUI.indentLevel;
+                }
+            }
         }
 
         private void DoEmissiveGUI(Material material)
@@ -610,6 +668,9 @@ namespace UnityEditor.Experimental.Rendering.HDPipeline
             SetKeyword(material, "_MATID_ANISO", materialId == Lit.MaterialId.LitAniso);
             SetKeyword(material, "_MATID_SPECULAR", materialId == Lit.MaterialId.LitSpecular);
             SetKeyword(material, "_MATID_CLEARCOAT", materialId == Lit.MaterialId.LitClearCoat);
+
+            bool refractionEnabled = material.GetFloat(kRefractionMode) > 0.0f;
+            SetKeyword(material, "_REFRACTION_ON", refractionEnabled);
         }
     }
 } // namespace UnityEditor

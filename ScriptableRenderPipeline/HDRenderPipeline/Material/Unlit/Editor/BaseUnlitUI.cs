@@ -28,14 +28,6 @@ namespace UnityEditor.Experimental.Rendering.HDPipeline
             public static GUIContent distortionOnlyText = new GUIContent("Distortion Only", "This shader will only be use to render distortion");
             public static GUIContent distortionDepthTestText = new GUIContent("Distortion Depth Test", "Enable the depth test for distortion");
 
-            public static GUIContent refractionEnableText = new GUIContent("Refraction", "Enable refraction on this shader"); 
-            public static GUIContent transmittanceColorText = new GUIContent("Transmittance Color", "Absorption color (RGB)");
-            public static GUIContent atDistanceText = new GUIContent("Transmittance Absorption Distance", "Absorption distance reference");
-            public static GUIContent thicknessMultiplierText = new GUIContent("Thickness multiplier", "Thickness multiplier"); 
-            public static GUIContent refractionThicknessText = new GUIContent("Refraction Thickness", "Thickness for rough refraction");
-            public static GUIContent refractionIORText = new GUIContent("Indice of refraction", "Indice of refraction");
-            public static string refractionModeText = "Refraction Mode";
-
             public static string advancedText = "Advanced Options";
         }
 
@@ -73,18 +65,6 @@ namespace UnityEditor.Experimental.Rendering.HDPipeline
         protected const string kDistortionOnly = "_DistortionOnly";
         protected MaterialProperty distortionDepthTest = null;
         protected const string kDistortionDepthTest = "_DistortionDepthTest";
-        protected MaterialProperty ior = null;
-        protected const string kIOR = "_IOR";
-        protected MaterialProperty transmittanceColor = null;
-        protected const string kTransmittanceColor = "_TransmittanceColor";
-        protected MaterialProperty atDistance = null;
-        protected const string kATDistance = "_ATDistance";
-        protected MaterialProperty thicknessMultiplier = null;
-        protected const string kThicknessMultiplier = "_ThicknessMultiplier";
-        protected MaterialProperty refractionMode = null;
-        protected const string kRefractionMode = "_RefractionMode";
-        protected MaterialProperty refractionThickness = null;
-        protected const string kRoughRefractionThickness = "_Thickness"; // Same as SSS thickness
 
         // See comment in LitProperties.hlsl
         const string kEmissionColor = "_EmissionColor";
@@ -108,12 +88,6 @@ namespace UnityEditor.Experimental.Rendering.HDPipeline
             distortionEnable = FindProperty(kDistortionEnable, props, false);
             distortionOnly = FindProperty(kDistortionOnly, props, false);
             distortionDepthTest = FindProperty(kDistortionDepthTest, props, false);
-            refractionMode = FindProperty(kRefractionMode, props, false);
-            transmittanceColor = FindProperty(kTransmittanceColor, props, false);
-            atDistance = FindProperty(kATDistance, props, false);
-            thicknessMultiplier = FindProperty(kThicknessMultiplier, props, false);
-            ior = FindProperty(kIOR, props, false);
-            refractionThickness = FindProperty(kRoughRefractionThickness, props, false);
         }
 
         void SurfaceTypePopup()
@@ -167,22 +141,6 @@ namespace UnityEditor.Experimental.Rendering.HDPipeline
                     {
                         m_MaterialEditor.ShaderProperty(distortionOnly, StylesBaseUnlit.distortionOnlyText);
                         m_MaterialEditor.ShaderProperty(distortionDepthTest, StylesBaseUnlit.distortionDepthTestText);
-                    }
-                }
-
-                if (refractionMode != null)
-                {
-                    m_MaterialEditor.ShaderProperty(refractionMode, StylesBaseUnlit.refractionModeText);
-                    var mode = (Lit.RefractionMode)refractionMode.floatValue;
-                    if (mode != Lit.RefractionMode.None)
-                    {
-                        m_MaterialEditor.ShaderProperty(ior, StylesBaseUnlit.refractionIORText);
-
-                        m_MaterialEditor.ShaderProperty(refractionThickness, StylesBaseUnlit.refractionThicknessText);
-                        m_MaterialEditor.ShaderProperty(thicknessMultiplier, StylesBaseUnlit.thicknessMultiplierText);
-
-                        m_MaterialEditor.ShaderProperty(transmittanceColor, StylesBaseUnlit.transmittanceColorText);
-                        m_MaterialEditor.ShaderProperty(atDistance, StylesBaseUnlit.atDistanceText);
                     }
                 }
             }
