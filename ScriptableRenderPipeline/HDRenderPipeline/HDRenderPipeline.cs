@@ -2,6 +2,7 @@
 using UnityEngine.Rendering;
 using System;
 using System.Linq;
+using NUnit.Framework.Constraints;
 using UnityEngine.Rendering.PostProcessing;
 using UnityEngine.Experimental.Rendering.HDPipeline.TilePass;
 
@@ -930,7 +931,7 @@ namespace UnityEngine.Experimental.Rendering.HDPipeline
                 CopyDepthBufferIfNeeded(cmd);
             }
 
-            RenderGaussianPyramidDepth(camera, cmd);
+            RenderPyramidDepth(camera, cmd);
 
             // Required for the SSS and the shader feature classification pass.
             PrepareAndBindStencilTexture(cmd);
@@ -1396,7 +1397,11 @@ namespace UnityEngine.Experimental.Rendering.HDPipeline
                 // The gaussian pyramid compute works in blocks of 8x8 so make sure the last lod has a
                 // minimum size of 8x8
                 int lodCount = Mathf.FloorToInt(Mathf.Log(size, 2f) - 3f);
-                lodCount = Mathf.Min(lodCount, HDShaderIDs._GaussianPyramidColorMips.Length - 1);
+                if (lodCount > HDShaderIDs._GaussianPyramidColorMips.Length)
+                {
+                    Debug.LogWarningFormat("Cannot compute all mipmaps of the color pyramid, max texture size supported: {0}", (2 << HDShaderIDs._GaussianPyramidColorMips.Length).ToString());
+                    lodCount = HDShaderIDs._GaussianPyramidColorMips.Length;
+                }
 
                 cmd.SetGlobalVector(HDShaderIDs._GaussianPyramidColorMipSize, new Vector4(size, size, lodCount, 0));
 
@@ -1425,12 +1430,12 @@ namespace UnityEngine.Experimental.Rendering.HDPipeline
             }
         }
 
-        void RenderGaussianPyramidDepth(Camera camera, CommandBuffer cmd)
+        void RenderPyramidDepth(Camera camera, CommandBuffer cmd)
         {
             if (!m_CurrentDebugDisplaySettings.renderingDebugSettings.enableGaussianPyramid)
                 return;
 
-            using (new Utilities.ProfilingSample("Gaussian Pyramid Depth", cmd))
+            using (new Utilities.ProfilingSample("Pyramid Depth", cmd))
             {
                 int w = camera.pixelWidth;
                 int h = camera.pixelHeight;
@@ -1439,7 +1444,11 @@ namespace UnityEngine.Experimental.Rendering.HDPipeline
                 // The gaussian pyramid compute works in blocks of 8x8 so make sure the last lod has a
                 // minimum size of 8x8
                 int lodCount = Mathf.FloorToInt(Mathf.Log(size, 2f) - 3f);
-                lodCount = Mathf.Min(lodCount, HDShaderIDs._DepthPyramidMips.Length);
+                if (lodCount > HDShaderIDs._DepthPyramidMips.Length)
+                {
+                    Debug.LogWarningFormat("Cannot compute all mipmaps of the depth pyramid, max texture size supported: {0}", (2 << HDShaderIDs._DepthPyramidMips.Length).ToString());
+                    lodCount = HDShaderIDs._DepthPyramidMips.Length;
+                }
 
                 cmd.SetGlobalVector(HDShaderIDs._DepthPyramidMipSize, new Vector4(size, size, lodCount, 0));
 
