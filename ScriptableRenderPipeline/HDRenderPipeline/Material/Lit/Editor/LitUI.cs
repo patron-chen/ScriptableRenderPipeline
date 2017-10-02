@@ -545,6 +545,7 @@ namespace UnityEditor.Experimental.Rendering.HDPipeline
             EditorGUILayout.Space();
             EditorGUILayout.LabelField(Styles.TransparencyInputsText, EditorStyles.boldLabel);
 
+            ++EditorGUI.indentLevel;
             var surfaceTypeValue = (SurfaceType)surfaceType.floatValue;
             if (surfaceTypeValue == SurfaceType.Transparent 
                 && refractionMode != null)
@@ -569,6 +570,7 @@ namespace UnityEditor.Experimental.Rendering.HDPipeline
                     --EditorGUI.indentLevel;
                 }
             }
+            --EditorGUI.indentLevel;
         }
 
         private void DoEmissiveGUI(Material material)
