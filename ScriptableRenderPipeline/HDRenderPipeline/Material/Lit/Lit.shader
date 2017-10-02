@@ -136,7 +136,7 @@
     #pragma shader_feature _DEPTHOFFSET_ON
     #pragma shader_feature _DOUBLESIDED_ON
     #pragma shader_feature _PER_PIXEL_DISPLACEMENT
-    #pragma shader_feature _REFRACTION_THINPLANE _REFRACTION_THICKPLANE _REFRACTION_THICKSPHERE
+    #pragma shader_feature _ _REFRACTION_THINPLANE _REFRACTION_THICKPLANE _REFRACTION_THICKSPHERE
 
     #pragma shader_feature _ _MAPPING_PLANAR _MAPPING_TRIPLANAR
     #pragma shader_feature _NORMALMAP_TANGENT_SPACE
