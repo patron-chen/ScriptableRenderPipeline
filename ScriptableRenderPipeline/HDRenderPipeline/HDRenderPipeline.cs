@@ -930,6 +930,8 @@ namespace UnityEngine.Experimental.Rendering.HDPipeline
                 CopyDepthBufferIfNeeded(cmd);
             }
 
+            RenderGaussianPyramidDepth(camera, cmd);
+
             // Required for the SSS and the shader feature classification pass.
             PrepareAndBindStencilTexture(cmd);
 
@@ -989,7 +991,6 @@ namespace UnityEngine.Experimental.Rendering.HDPipeline
                 RenderSky(hdCamera, cmd);
 
                 RenderGaussianPyramidColor(camera, cmd);
-                RenderGaussianPyramidDepth(camera, cmd);
 
                 // Render all type of transparent forward (unlit, lit, complex (hair...)) to keep the sorting between transparent objects.
                 RenderForward(m_CullResults, camera, renderContext, cmd, false);
