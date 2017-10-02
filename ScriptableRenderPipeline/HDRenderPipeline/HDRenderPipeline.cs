@@ -282,40 +282,6 @@ namespace UnityEngine.Experimental.Rendering.HDPipeline
 
     public partial class HDRenderPipeline : RenderPipeline
     {
-        static readonly int[] k_GaussianPyramidColorMipID =
-        {
-            Shader.PropertyToID("_GaussianColorMip0"),
-            Shader.PropertyToID("_GaussianColorMip1"),
-            Shader.PropertyToID("_GaussianColorMip2"),
-            Shader.PropertyToID("_GaussianColorMip3"),
-            Shader.PropertyToID("_GaussianColorMip4"),
-            Shader.PropertyToID("_GaussianColorMip5"),
-            Shader.PropertyToID("_GaussianColorMip6"),
-            Shader.PropertyToID("_GaussianColorMip7"),
-            Shader.PropertyToID("_GaussianColorMip8"),
-            Shader.PropertyToID("_GaussianColorMip9"),
-            Shader.PropertyToID("_GaussianColorMip10"),
-            Shader.PropertyToID("_GaussianColorMip11"),
-            Shader.PropertyToID("_GaussianColorMip12")
-        };
-
-        static readonly int[] k_DepthPyramidMipID =
-        {
-            Shader.PropertyToID("_DepthPyramidMip0"),
-            Shader.PropertyToID("_DepthPyramidMip1"),
-            Shader.PropertyToID("_DepthPyramidMip2"),
-            Shader.PropertyToID("_DepthPyramidMip3"),
-            Shader.PropertyToID("_DepthPyramidMip4"),
-            Shader.PropertyToID("_DepthPyramidMip5"),
-            Shader.PropertyToID("_DepthPyramidMip6"),
-            Shader.PropertyToID("_DepthPyramidMip7"),
-            Shader.PropertyToID("_DepthPyramidMip8"),
-            Shader.PropertyToID("_DepthPyramidMip9"),
-            Shader.PropertyToID("_DepthPyramidMip10"),
-            Shader.PropertyToID("_DepthPyramidMip11"),
-            Shader.PropertyToID("_DepthPyramidMip12")
-        };
-
         readonly HDRenderPipelineAsset m_Asset;
 
         readonly RenderPipelineMaterial m_DeferredMaterial;
@@ -1429,7 +1395,7 @@ namespace UnityEngine.Experimental.Rendering.HDPipeline
                 // The gaussian pyramid compute works in blocks of 8x8 so make sure the last lod has a
                 // minimum size of 8x8
                 int lodCount = Mathf.FloorToInt(Mathf.Log(size, 2f) - 3f);
-                lodCount = Mathf.Min(lodCount, k_GaussianPyramidColorMipID.Length - 1);
+                lodCount = Mathf.Min(lodCount, HDShaderIDs._GaussianPyramidColorMips.Length - 1);
 
                 cmd.SetGlobalVector(HDShaderIDs._GaussianPyramidColorMipSize, new Vector4(size, size, lodCount, 0));
 
@@ -1441,20 +1407,20 @@ namespace UnityEngine.Experimental.Rendering.HDPipeline
                 {
                     size >>= 1;
 
-                    cmd.GetTemporaryRT(k_GaussianPyramidColorMipID[i + 1], size, size, 0, FilterMode.Bilinear, RenderTextureFormat.ARGBHalf, RenderTextureReadWrite.Linear, 1, true);
+                    cmd.GetTemporaryRT(HDShaderIDs._GaussianPyramidColorMips[i + 1], size, size, 0, FilterMode.Bilinear, RenderTextureFormat.ARGBHalf, RenderTextureReadWrite.Linear, 1, true);
                     cmd.SetComputeTextureParam(m_GaussianPyramidCS, m_GaussianPyramidKernel, "_Source", last);
-                    cmd.SetComputeTextureParam(m_GaussianPyramidCS, m_GaussianPyramidKernel, "_Result", k_GaussianPyramidColorMipID[i + 1]);
+                    cmd.SetComputeTextureParam(m_GaussianPyramidCS, m_GaussianPyramidKernel, "_Result", HDShaderIDs._GaussianPyramidColorMips[i + 1]);
                     cmd.SetComputeVectorParam(m_GaussianPyramidCS, "_Size", new Vector4(size, size, 1f / size, 1f / size));
                     cmd.DispatchCompute(m_GaussianPyramidCS, m_GaussianPyramidKernel, size / 8, size / 8, 1);
-                    cmd.CopyTexture(k_GaussianPyramidColorMipID[i + 1], 0, 0, m_GaussianPyramidColorBufferRT, 0, i + 1);
+                    cmd.CopyTexture(HDShaderIDs._GaussianPyramidColorMips[i + 1], 0, 0, m_GaussianPyramidColorBufferRT, 0, i + 1);
 
-                    last = k_GaussianPyramidColorMipID[i + 1];
+                    last = HDShaderIDs._GaussianPyramidColorMips[i + 1];
                 }
 
                 cmd.SetGlobalTexture(HDShaderIDs._GaussianPyramidColorTexture, m_GaussianPyramidColorBuffer);
 
                 for (int i = 0; i < lodCount; i++)
-                    cmd.ReleaseTemporaryRT(k_GaussianPyramidColorMipID[i + 1]);
+                    cmd.ReleaseTemporaryRT(HDShaderIDs._GaussianPyramidColorMips[i + 1]);
             }
         }
 
@@ -1472,33 +1438,33 @@ namespace UnityEngine.Experimental.Rendering.HDPipeline
                 // The gaussian pyramid compute works in blocks of 8x8 so make sure the last lod has a
                 // minimum size of 8x8
                 int lodCount = Mathf.FloorToInt(Mathf.Log(size, 2f) - 3f);
-                lodCount = Mathf.Min(lodCount, k_DepthPyramidMipID.Length);
+                lodCount = Mathf.Min(lodCount, HDShaderIDs._DepthPyramidMips.Length);
 
                 cmd.SetGlobalVector(HDShaderIDs._DepthPyramidMipSize, new Vector4(size, size, lodCount, 0));
 
-                cmd.GetTemporaryRT(k_DepthPyramidMipID[0], size, size, 0, FilterMode.Bilinear, RenderTextureFormat.RFloat, RenderTextureReadWrite.Linear, 1, true);
+                cmd.GetTemporaryRT(HDShaderIDs._DepthPyramidMips[0], size, size, 0, FilterMode.Bilinear, RenderTextureFormat.RFloat, RenderTextureReadWrite.Linear, 1, true);
                 cmd.SetComputeTextureParam(m_DepthPyramidCS, m_DepthPyramidCopyKernel, "_SourceDepthStencil", GetDepthTexture());
-                cmd.SetComputeTextureParam(m_DepthPyramidCS, m_DepthPyramidCopyKernel, "_Result", k_DepthPyramidMipID[0]);
+                cmd.SetComputeTextureParam(m_DepthPyramidCS, m_DepthPyramidCopyKernel, "_Result", HDShaderIDs._DepthPyramidMips[0]);
                 cmd.SetComputeVectorParam(m_DepthPyramidCS, "_Size", new Vector4(size, size, 1f / size, 1f / size));
                 cmd.DispatchCompute(m_DepthPyramidCS, m_DepthPyramidCopyKernel, size / 8, size / 8, 1);
-                cmd.CopyTexture(k_DepthPyramidMipID[0], 0, 0, m_DepthPyramidBuffer, 0, 0);
+                cmd.CopyTexture(HDShaderIDs._DepthPyramidMips[0], 0, 0, m_DepthPyramidBuffer, 0, 0);
 
                 for (int i = 0; i < lodCount; i++)
                 {
                     size >>= 1;
 
-                    cmd.GetTemporaryRT(k_DepthPyramidMipID[i + 1], size, size, 0, FilterMode.Bilinear, RenderTextureFormat.RFloat, RenderTextureReadWrite.Linear, 1, true);
-                    cmd.SetComputeTextureParam(m_DepthPyramidCS, m_DepthPyramidKernel, "_Source", k_DepthPyramidMipID[i]);
-                    cmd.SetComputeTextureParam(m_DepthPyramidCS, m_DepthPyramidKernel, "_Result", k_DepthPyramidMipID[i + 1]);
+                    cmd.GetTemporaryRT(HDShaderIDs._DepthPyramidMips[i + 1], size, size, 0, FilterMode.Bilinear, RenderTextureFormat.RFloat, RenderTextureReadWrite.Linear, 1, true);
+                    cmd.SetComputeTextureParam(m_DepthPyramidCS, m_DepthPyramidKernel, "_Source", HDShaderIDs._DepthPyramidMips[i]);
+                    cmd.SetComputeTextureParam(m_DepthPyramidCS, m_DepthPyramidKernel, "_Result", HDShaderIDs._DepthPyramidMips[i + 1]);
                     cmd.SetComputeVectorParam(m_DepthPyramidCS, "_Size", new Vector4(size, size, 1f / size, 1f / size));
                     cmd.DispatchCompute(m_DepthPyramidCS, m_DepthPyramidKernel, size / 8, size / 8, 1);
-                    cmd.CopyTexture(k_DepthPyramidMipID[i + 1], 0, 0, m_DepthPyramidBufferRT, 0, i + 1);
+                    cmd.CopyTexture(HDShaderIDs._DepthPyramidMips[i + 1], 0, 0, m_DepthPyramidBufferRT, 0, i + 1);
                 }
 
                 cmd.SetGlobalTexture(HDShaderIDs._DepthPyramidTexture, m_DepthPyramidBuffer);
 
                 for (int i = 0; i < lodCount + 1; i++)
-                    cmd.ReleaseTemporaryRT(k_DepthPyramidMipID[i]);
+                    cmd.ReleaseTemporaryRT(HDShaderIDs._DepthPyramidMips[i]);
             }
         }
 
