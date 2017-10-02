@@ -1634,12 +1634,6 @@ namespace UnityEngine.Experimental.Rendering.HDPipeline
                     Utilities.SetRenderTarget(cmd, m_CameraColorBufferRT, m_CameraDepthStencilBufferRT, ClearFlag.ClearDepth);
                 }
 
-                // Clear the gaussian pyramid target
-                using (new Utilities.ProfilingSample("Clear gaussian pyramid target", cmd))
-                {
-                    Utilities.SetRenderTarget(cmd, m_CameraSssDiffuseLightingBufferRT, ClearFlag.ClearColor, Color.black);
-                }
-
                 // Clear the diffuse SSS lighting target
                 using (new Utilities.ProfilingSample("Clear SSS diffuse target", cmd))
                 {
