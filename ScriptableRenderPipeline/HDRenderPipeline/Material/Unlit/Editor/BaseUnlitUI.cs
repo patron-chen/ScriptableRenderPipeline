@@ -172,15 +172,8 @@ namespace UnityEditor.Experimental.Rendering.HDPipeline
 
                 if (refractionMode != null)
                 {
+                    m_MaterialEditor.ShaderProperty(refractionMode, StylesBaseUnlit.refractionModeText);
                     var mode = (Lit.RefractionMode)refractionMode.floatValue;
-                    EditorGUI.BeginChangeCheck();
-                    mode = (Lit.RefractionMode)EditorGUILayout.Popup(StylesBaseUnlit.refractionModeText, (int)mode, StylesBaseUnlit.refractionModeTypeNames);
-                    if (EditorGUI.EndChangeCheck())
-                    {
-                        m_MaterialEditor.RegisterPropertyChangeUndo("Refraction Mode");
-                        refractionMode.floatValue = (float)mode;
-                    }
-
                     if (mode != Lit.RefractionMode.None)
                     {
                         m_MaterialEditor.ShaderProperty(ior, StylesBaseUnlit.refractionIORText);

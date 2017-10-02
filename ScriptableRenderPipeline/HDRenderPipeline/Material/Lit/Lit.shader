@@ -77,7 +77,7 @@
         [ToggleOff]  _AlphaCutoffEnable("Alpha Cutoff Enable", Float) = 0.0
         _AlphaCutoff("Alpha Cutoff", Range(0.0, 1.0)) = 0.5
 
-        [ToggleOff]  _RefractionMode("Refraction Mode", Int) = 0
+        [Enum(None, 0, ThickPlane, 1, ThickSphere, 2, ThinPlane, 3)]_RefractionMode("Refraction Mode", Int) = 0
         _IOR("Indice Of Refraction", Range(1.0, 3.0)) = 1.0
         _ThicknessMultiplier("Thickness Multiplier", Float) = 1.0
         _TransmittanceColor("Transmittance Color", Color) = (1.0, 1.0, 1.0)

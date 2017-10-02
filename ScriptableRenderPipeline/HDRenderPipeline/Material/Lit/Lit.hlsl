@@ -1495,7 +1495,7 @@ void EvaluateBSDF_SSL(  float3 V, PositionInputs posInput, BSDFData bsdfData, ou
         float opticalDepth = 0.0;
         bool refractedPointFound = false;
 
-        if (bsdfData.refractionMode == REFRACTIONMODE_SOLID_PLANE)
+        if (bsdfData.refractionMode == REFRACTIONMODE_THICK_PLANE)
         {
             // Solid plane
             // Ray only refact once, like if it solid
@@ -1510,7 +1510,7 @@ void EvaluateBSDF_SSL(  float3 V, PositionInputs posInput, BSDFData bsdfData, ou
             opticalDepth = bsdfData.thickness;
             refractedPointFound = true;
         }
-        else if (bsdfData.refractionMode == REFRACTIONMODE_SOLID_SPHERE)
+        else if (bsdfData.refractionMode == REFRACTIONMODE_THICK_SPHERE)
         {
             // Solid Sphere
             // Approximate locally with a sphere of radius bsdfData.thickness/2 with normal bsdfData.normalWS
@@ -1538,7 +1538,7 @@ void EvaluateBSDF_SSL(  float3 V, PositionInputs posInput, BSDFData bsdfData, ou
             refractedBackPointWS = P1 - R2*(depthFromPosition - NoR1*VoR1*bsdfData.thickness) / N1oR2;
             refractedPointFound = true;
         }
-        else if (bsdfData.refractionMode == REFRACTIONMODE_THICK_PLANE)
+        else if (bsdfData.refractionMode == REFRACTIONMODE_THIN_PLANE)
         {
             // thick plane
             float3 R = refract(-V, bsdfData.normalWS, 1.0 / bsdfData.ior);

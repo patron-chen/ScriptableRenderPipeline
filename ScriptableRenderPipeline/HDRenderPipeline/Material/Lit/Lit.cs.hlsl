@@ -33,9 +33,9 @@
 // UnityEngine.Experimental.Rendering.HDPipeline.Lit+RefractionMode:  static fields
 //
 #define REFRACTIONMODE_NONE (0)
-#define REFRACTIONMODE_SOLID_PLANE (1)
-#define REFRACTIONMODE_SOLID_SPHERE (2)
-#define REFRACTIONMODE_THICK_PLANE (3)
+#define REFRACTIONMODE_THICK_PLANE (1)
+#define REFRACTIONMODE_THICK_SPHERE (2)
+#define REFRACTIONMODE_THIN_PLANE (3)
 
 //
 // UnityEngine.Experimental.Rendering.HDPipeline.Lit+SurfaceData:  static fields
