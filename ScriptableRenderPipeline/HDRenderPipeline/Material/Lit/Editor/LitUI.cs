@@ -79,7 +79,8 @@ namespace UnityEditor.Experimental.Rendering.HDPipeline
             public static string refractionModeText = "Refraction Mode";
             public static GUIContent refractionIORText = new GUIContent("Indice of refraction", "Indice of refraction");
             public static GUIContent refractionThicknessText = new GUIContent("Refraction Thickness", "Thickness for rough refraction");
-            public static GUIContent thicknessMultiplierText = new GUIContent("Thickness multiplier", "Thickness multiplier");
+            public static GUIContent refractionThicknessMultiplierText = new GUIContent("Refraction Thickness multiplier", "Thickness multiplier");
+            public static GUIContent refractionThicknessMapText = new GUIContent("Refraction Thickness Map (R)", "Thickness multiplier");
             // Transparency absorption
             public static GUIContent transmittanceColorText = new GUIContent("Transmittance Color", "Absorption color (RGB)");
             public static GUIContent atDistanceText = new GUIContent("Transmittance Absorption Distance", "Absorption distance reference");
@@ -556,10 +557,10 @@ namespace UnityEditor.Experimental.Rendering.HDPipeline
 
                     if (thicknessMap.textureValue == null)
                         m_MaterialEditor.ShaderProperty(thickness, Styles.refractionThicknessText);
-                    m_MaterialEditor.TexturePropertySingleLine(Styles.thicknessMapText, thicknessMap);
+                    m_MaterialEditor.TexturePropertySingleLine(Styles.refractionThicknessMapText, thicknessMap);
 
                     ++EditorGUI.indentLevel;
-                    m_MaterialEditor.ShaderProperty(thicknessMultiplier, Styles.thicknessMultiplierText);
+                    m_MaterialEditor.ShaderProperty(thicknessMultiplier, Styles.refractionThicknessMultiplierText);
                     --EditorGUI.indentLevel;
 
                     m_MaterialEditor.ShaderProperty(transmittanceColor, Styles.transmittanceColorText);
