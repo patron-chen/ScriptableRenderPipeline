@@ -18,7 +18,6 @@ namespace UnityEditor.Experimental.Rendering.HDPipeline
             public static string blendModeText = "Blend Mode";
 
             public static readonly string[] surfaceTypeNames = Enum.GetNames(typeof(SurfaceType));
-            public static readonly string[] refractionModeTypeNames = Enum.GetNames(typeof(Lit.RefractionMode));
             public static readonly string[] blendModeNames = Enum.GetNames(typeof(BlendMode));
 
             public static GUIContent alphaCutoffEnableText = new GUIContent("Alpha Cutoff Enable", "Threshold for alpha cutoff");

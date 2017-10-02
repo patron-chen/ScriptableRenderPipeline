@@ -214,21 +214,6 @@ float ADD_IDX(GetSurfaceData)(FragInputs input, LayerTexCoord layerTexCoord, out
 #endif
     surfaceData.metallic *= ADD_IDX(_Metallic);
 
-#ifdef _REFRACTION_ON
-    surfaceData.ior = _IOR;
-    surfaceData.transmittanceColor = _TransmittanceColor;
-    surfaceData.atDistance = _ATDistance;
-    surfaceData.thicknessMultiplier = _ThicknessMultiplier;
-    surfaceData.refractionMode = _RefractionMode;
-    // Thickness already defined
-#else
-    surfaceData.ior = 1.0;
-    surfaceData.transmittanceColor = float3(1.0, 1.0, 1.0);
-    surfaceData.atDistance = 1.0;
-    surfaceData.thicknessMultiplier = 1000000.0;
-    surfaceData.refractionMode = 0;
-#endif
-
     // This part of the code is not used in case of layered shader but we keep the same macro system for simplicity
 #if !defined(LAYERED_LIT_SHADER)
 
@@ -282,6 +267,18 @@ float ADD_IDX(GetSurfaceData)(FragInputs input, LayerTexCoord layerTexCoord, out
     surfaceData.specularColor *= SAMPLE_UVMAPPING_TEXTURE2D(_SpecularColorMap, sampler_SpecularColorMap, layerTexCoord.base).rgb;
 #endif
 
+#if defined(_REFRACTION_THINPLANE) || defined(_REFRACTION_THICKPLANE) || defined(_REFRACTION_THICKSPHERE)
+    surfaceData.ior = _IOR;
+    surfaceData.transmittanceColor = _TransmittanceColor;
+    surfaceData.atDistance = _ATDistance;
+    // Thickness already defined with SSS (from both thickness and thicknessMap)
+    surfaceData.thickness *= _ThicknessMultiplier;
+#else
+    surfaceData.ior = 1.0;
+    surfaceData.transmittanceColor = float3(1.0, 1.0, 1.0);
+    surfaceData.atDistance = 1.0;
+#endif
+
     surfaceData.coatNormalWS    = input.worldToTangent[2].xyz; // Assign vertex normal
     surfaceData.coatCoverage    = _CoatCoverage;
     surfaceData.coatIOR         = _CoatIOR;
@@ -304,7 +301,11 @@ float ADD_IDX(GetSurfaceData)(FragInputs input, LayerTexCoord layerTexCoord, out
     surfaceData.coatNormalWS = float3(0.0, 0.0, 0.0);
     surfaceData.coatCoverage = 0.0f;
     surfaceData.coatIOR = 0.5;
-    surfaceData.refractionMode = 0;
+
+    // Transparency
+    surfaceData.ior = 1.0;
+    surfaceData.transmittanceColor = float3(1.0, 1.0, 1.0);
+    surfaceData.atDistance = 1000000.0;
 
 #endif // #if !defined(LAYERED_LIT_SHADER)
 

@@ -670,8 +670,10 @@ namespace UnityEditor.Experimental.Rendering.HDPipeline
             SetKeyword(material, "_MATID_SPECULAR", materialId == Lit.MaterialId.LitSpecular);
             SetKeyword(material, "_MATID_CLEARCOAT", materialId == Lit.MaterialId.LitClearCoat);
 
-            bool refractionEnabled = material.GetFloat(kRefractionMode) > 0.0f;
-            SetKeyword(material, "_REFRACTION_ON", refractionEnabled);
+            var refractionModeValue = (Lit.RefractionMode)material.GetFloat(kRefractionMode);
+            SetKeyword(material, "_REFRACTION_THINPLANE", refractionModeValue == Lit.RefractionMode.ThinPlane);
+            SetKeyword(material, "_REFRACTION_THICKPLANE", refractionModeValue == Lit.RefractionMode.ThickPlane);
+            SetKeyword(material, "_REFRACTION_THICKSPHERE", refractionModeValue == Lit.RefractionMode.ThickSphere);
         }
     }
 } // namespace UnityEditor

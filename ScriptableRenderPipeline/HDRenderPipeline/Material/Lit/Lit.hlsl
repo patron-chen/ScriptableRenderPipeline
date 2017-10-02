@@ -252,6 +252,15 @@ void FillMaterialIdClearCoatData(float3 coatNormalWS, float coatCoverage, float 
     bsdfData.coatCoverage = coatCoverage;
 }
 
+void FillMaterialIdTransparencyData(float ior, float3 transmittanceColor, float atDistance, float thickness, inout BSDFData bsdfData)
+{
+    // Uses thickness from SSS's property set
+    bsdfData.ior = ior;
+    // Absorption coefficient from Disney: http://blog.selfshadow.com/publications/s2015-shading-course/burley/s2015_pbs_disney_bsdf_notes.pdf
+    bsdfData.absorptionCoefficient = -log(transmittanceColor + 0.00001) / atDistance;
+    bsdfData.thickness = max(0.0001, thickness);
+}
+
 // For image based lighting, a part of the BSDF is pre-integrated.
 // This is done both for specular and diffuse (in case of DisneyDiffuse)
 void GetPreIntegratedFGD(float NdotV, float perceptualRoughness, float3 fresnel0, out float3 specularFGD, out float diffuseFGD)
@@ -310,11 +319,6 @@ BSDFData ConvertSurfaceDataToBSDFData(SurfaceData surfaceData)
     bsdfData.perceptualRoughness = PerceptualSmoothnessToPerceptualRoughness(surfaceData.perceptualSmoothness);
     bsdfData.roughness = PerceptualRoughnessToRoughness(bsdfData.perceptualRoughness);
     bsdfData.materialId = surfaceData.materialId;
-    bsdfData.ior = surfaceData.ior;
-    bsdfData.transmittanceColor = surfaceData.transmittanceColor;
-    bsdfData.atDistance = surfaceData.atDistance;
-    bsdfData.refractionMode = surfaceData.refractionMode;
-    bsdfData.thickness = surfaceData.thickness * surfaceData.thicknessMultiplier;
 
     // IMPORTANT: In case of foward or gbuffer pass we must know what we are statically, so compiler can do compile time optimization
     if (bsdfData.materialId == MATERIALID_LIT_STANDARD)
@@ -344,6 +348,10 @@ BSDFData ConvertSurfaceDataToBSDFData(SurfaceData surfaceData)
         FillMaterialIdClearCoatData(surfaceData.coatNormalWS, surfaceData.coatCoverage, surfaceData.coatIOR, bsdfData);
     }
 
+#if defined(_REFRACTION_THINPLANE) || defined(_REFRACTION_THICKPLANE) || defined(_REFRACTION_THICKSPHERE)
+    // Note: Will override thickness of SSS's property set
+    FillMaterialIdTransparencyData(surfaceData.ior, surfaceData.transmittanceColor, surfaceData.atDistance, surfaceData.thickness, bsdfData);
+#endif
 
     return bsdfData;
 }
@@ -1487,101 +1495,139 @@ void EvaluateBSDF_SSL(  float3 V, PositionInputs posInput, BSDFData bsdfData, ou
     specularLighting = float3(0.0, 0.0, 0.0);
     weight = float2(0.0, 0.0);
 
-    if (bsdfData.refractionMode != REFRACTIONMODE_NONE)
+#if defined(_REFRACTION_THINPLANE) || defined(_REFRACTION_THICKPLANE) || defined(_REFRACTION_THICKSPHERE)
+    /*
+     * Refraction process:
+     *  1. Depending on the shape model, we calculate the refracted point in world space and the optical depth
+     *  2. We calculate the screen space position of the refracted point
+     *  3. If this point is available (ie: in color GBuffer and point is not in front of the object)
+     *    a. Get the corresponding color depending on the roughness from the gaussian pyramid of the color buffer
+     *    b. Multiply by the transmittance for absorption (depends on the optical depth)
+     */
+
+    weight.x = 1.0;
+
+    float3 refractedBackPointWS = float3(0.0, 0.0, 0.0);
+    float opticalDepth = 0.0;
+
+    /*
+     * For all refraction approximation, to calculate the refracted point in world space,
+     *   we approximate the scene as a plane (back plane) with normal -V at the depth hit point.
+     *   (We avoid to raymarch the depth texture to get the refracted point.)
+     */
+#if defined(_REFRACTION_THICKPLANE)
+    /*
+     * Thick plane shape model:
+     *  We approximate locally the shape of the object as halfspace defined by the normal {bsdfData.normallWS} at {bsdfData.positionWS}
+     *  Thus, the light is refracted once.
+     *  It approximate cubic filled shapes
+     * 
+     * However, we can't approximate the optical depth of the object, so we use a constant as parameter ({bsdfData.thickness})
+     */
+    // Refracted ray
+    float3 R = refract(-V, bsdfData.normalWS, 1.0 / bsdfData.ior);
+
+    // Get the depth of the approximated back plane
+    float pyramidDepth = _PyramidDepthTexture.SampleLevel(sampler_PyramidDepthTexture, posInput.positionSS, 2.0).r;
+    float depth = LinearEyeDepth(pyramidDepth, _ZBufferParams);
+
+    // Distance from point to the back plane
+    float distFromP = depth - posInput.depthVS;
+
+    float VoR = dot(-V, R);
+    refractedBackPointWS = posInput.positionWS + R*distFromP / VoR;
+    opticalDepth = bsdfData.thickness;
+
+#elif defined(_REFRACTION_THICKSPHERE)
+     /*
+     * Thick sphere shape model:
+     *  We approximate locally the shape of the object as sphere, that is tangent to the shape.
+     *  The sphere has a diameter of {bsdfData.thickness}
+     *  The center of the sphere is at {bsdfData.positionWS} - {bsdfData.normalWS} * {bsdfData.thickness}
+     *
+     *  So the light is refracted twice: in and out of the tangent sphere
+     */
+     // Get the depth of the approximated back plane
+    float pyramidDepth = _PyramidDepthTexture.SampleLevel(sampler_PyramidDepthTexture, posInput.positionSS, 2.0).r;
+    float depth = LinearEyeDepth(pyramidDepth, _ZBufferParams);
+    
+    // Distance from point to the back plane
+    float depthFromPosition = depth - posInput.depthVS;
+
+    // First refraction (tangent sphere in)
+    // Refracted ray
+    float3 R1 = refract(-V, bsdfData.normalWS, 1.0 / bsdfData.ior);
+    // Center of the tangent sphere
+    float3 C = posInput.positionWS - bsdfData.normalWS*bsdfData.thickness*0.5;
+
+    // Second refraction (tangent sphere out)
+    float NoR1 = dot(bsdfData.normalWS, R1);
+    // Optical depth within the sphere
+    opticalDepth = -NoR1*bsdfData.thickness;
+    // Out hit point in the tangent sphere
+    float3 P1 = posInput.positionWS + R1*opticalDepth;
+    // Out normal
+    float3 N1 = normalize(C - P1);
+    // Out refracted ray
+    float3 R2 = refract(R1, N1, bsdfData.ior);
+    float N1oR2 = dot(N1, R2);
+    float VoR1 = dot(V, R1);
+
+    // Refracted source point
+    refractedBackPointWS = P1 - R2*(depthFromPosition - NoR1*VoR1*bsdfData.thickness) / N1oR2;
+
+#elif defined(_REFRACTION_THINPLANE)
+    /*
+     * Thin plane shape model:
+     *  We approximate locally the shape of the object as a plane with normal {bsdfData.normalWS} at {bsdfData.positionWS}
+     *  with a thickness {bsdfData.thickness}
+     */
+    // Refracted ray
+    float3 R = refract(-V, bsdfData.normalWS, 1.0 / bsdfData.ior);
+
+    // Get the depth of the approximated back plane
+    float pyramidDepth = _PyramidDepthTexture.SampleLevel(sampler_PyramidDepthTexture, posInput.positionSS, 2.0).r;
+    float depth = LinearEyeDepth(pyramidDepth, _ZBufferParams);
+
+    // Distance from point to the back plane
+    float distFromP = depth - posInput.depthVS;
+
+    // Optical depth within the thin plane
+    opticalDepth = bsdfData.thickness / dot(R, -bsdfData.normalWS);
+
+    // The refracted ray exiting the thin plane is the same as the incident ray (parallel interfaces and same ior)
+    float VoR = dot(-V, R);
+    float VoN = dot(V, bsdfData.normalWS);
+    refractedBackPointWS = posInput.positionWS + R*opticalDepth - V*(distFromP - VoR*opticalDepth);
+#endif
+
+    // Calculate screen space coordinates of refracted point in back plane
+    float4 refractedBackPointCS = mul(_ViewProjMatrix, float4(refractedBackPointWS, 1.0));
+    float2 refractedBackPointSS = ComputeScreenSpacePosition(refractedBackPointCS);
+    float refractedBackPointDepth = LinearEyeDepth(_PyramidDepthTexture.SampleLevel(sampler_PyramidDepthTexture, refractedBackPointSS, 0.0).r, _ZBufferParams);
+
+    // Exit if texel is out of color buffer
+    // Or if the texel is from an object in front of the object
+    if (refractedBackPointDepth < posInput.depthVS
+        || refractedBackPointSS.x < 0.0 || refractedBackPointSS.x > 1.0
+        || refractedBackPointSS.y < 0.0 || refractedBackPointSS.y > 1.0)
     {
-        weight.x = 1.0;
-
-        float3 refractedBackPointWS = float3(0.0, 0.0, 0.0);
-        float opticalDepth = 0.0;
-        bool refractedPointFound = false;
-
-        if (bsdfData.refractionMode == REFRACTIONMODE_THICK_PLANE)
-        {
-            // Solid plane
-            // Ray only refact once, like if it solid
-            float3 R = refract(-V, bsdfData.normalWS, 1.0 / bsdfData.ior);
-
-            float pyramidDepth = _PyramidDepthTexture.SampleLevel(sampler_PyramidDepthTexture, posInput.positionSS, 2.0).r;
-            float depth = LinearEyeDepth(pyramidDepth, _ZBufferParams);
-            float distFromP = depth - posInput.depthVS;
-
-            float VoR = dot(-V, R);
-            refractedBackPointWS = posInput.positionWS + R*distFromP / VoR;
-            opticalDepth = bsdfData.thickness;
-            refractedPointFound = true;
-        }
-        else if (bsdfData.refractionMode == REFRACTIONMODE_THICK_SPHERE)
-        {
-            // Solid Sphere
-            // Approximate locally with a sphere of radius bsdfData.thickness/2 with normal bsdfData.normalWS
-            float pyramidDepth = _PyramidDepthTexture.SampleLevel(sampler_PyramidDepthTexture, posInput.positionSS, 2.0).r;
-            float depth = LinearEyeDepth(pyramidDepth, _ZBufferParams);
-            float depthFromPosition = depth - posInput.depthVS;
-
-            // Refracted ray within sphere
-            float3 R1 = refract(-V, bsdfData.normalWS, 1.0 / bsdfData.ior);
-            // Center of the sphere
-            float3 C = posInput.positionWS - bsdfData.normalWS*bsdfData.thickness*0.5;
-
-            float NoR1 = dot(bsdfData.normalWS, R1);
-            // Out hit point in the sphere
-            opticalDepth = -NoR1*bsdfData.thickness;
-            float3 P1 = posInput.positionWS + R1*opticalDepth;
-            // Out normal
-            float3 N1 = normalize(C - P1);
-            // Out refracted ray
-            float3 R2 = refract(R1, N1, bsdfData.ior);
-            float N1oR2 = dot(N1, R2);
-            float VoR1 = dot(V, R1);
-
-            // Refracted source point
-            refractedBackPointWS = P1 - R2*(depthFromPosition - NoR1*VoR1*bsdfData.thickness) / N1oR2;
-            refractedPointFound = true;
-        }
-        else if (bsdfData.refractionMode == REFRACTIONMODE_THIN_PLANE)
-        {
-            // thick plane
-            float3 R = refract(-V, bsdfData.normalWS, 1.0 / bsdfData.ior);
-
-            float pyramidDepth = _PyramidDepthTexture.SampleLevel(sampler_PyramidDepthTexture, posInput.positionSS, 2.0).r;
-            float depth = LinearEyeDepth(pyramidDepth, _ZBufferParams);
-            float distFromP = depth - posInput.depthVS;
-
-            opticalDepth = bsdfData.thickness / dot(R, -bsdfData.normalWS);
-
-            float VoR = dot(-V, R);
-            float VoN = dot(V, bsdfData.normalWS);
-            refractedBackPointWS = posInput.positionWS + R*opticalDepth - V*(distFromP - VoR*opticalDepth);
-            refractedPointFound = true;
-        }
-
-        if (!refractedPointFound)
-        {
-            diffuseLighting = _GaussianPyramidColorTexture.SampleLevel(sampler_GaussianPyramidColorTexture, posInput.positionSS, 0.0).rgb;
-            return;
-        }
-
-        float4 refractedBackPointCS = mul(_ViewProjMatrix, float4(refractedBackPointWS, 1.0));
-        float2 refractedBackPointSS = ComputeScreenSpacePosition(refractedBackPointCS);
-        float refractedBackPointDepth = LinearEyeDepth(_PyramidDepthTexture.SampleLevel(sampler_PyramidDepthTexture, refractedBackPointSS, 0.0).r, _ZBufferParams);
-
-        // pixel out of buffer
-        // Refracted point is in front of current object
-        if (refractedBackPointDepth < posInput.depthVS
-            || refractedBackPointSS.x < 0.0 || refractedBackPointSS.x > 1.0
-            || refractedBackPointSS.y < 0.0 || refractedBackPointSS.y > 1.0)
-        {
-            diffuseLighting = _GaussianPyramidColorTexture.SampleLevel(sampler_GaussianPyramidColorTexture, posInput.positionSS, 0.0).rgb;
-            return;
-        }
-
-        float mipLevel = PerceptualRoughnessToMipmapLevel(bsdfData.perceptualRoughness);
-        diffuseLighting = _GaussianPyramidColorTexture.SampleLevel(sampler_GaussianPyramidColorTexture, refractedBackPointSS.xy, mipLevel);
-
-        float3 absorptionCoefficient = -log(bsdfData.transmittanceColor + 0.00001) / bsdfData.atDistance;
-        float3 transmittance = exp(-absorptionCoefficient*opticalDepth);
-        diffuseLighting *= transmittance;
+        diffuseLighting = _GaussianPyramidColorTexture.SampleLevel(sampler_GaussianPyramidColorTexture, posInput.positionSS, 0.0).rgb;
+        return;
     }
+
+    // Map the roughness to the correct mip map level of the color pyramid
+    float mipLevel = PerceptualRoughnessToMipmapLevel(bsdfData.perceptualRoughness);
+    diffuseLighting = _GaussianPyramidColorTexture.SampleLevel(sampler_GaussianPyramidColorTexture, refractedBackPointSS.xy, mipLevel);
+
+    // Beer-Lamber law for absorption
+    float3 transmittance = exp(-bsdfData.absorptionCoefficient * opticalDepth);
+    diffuseLighting *= transmittance;
+
+#else
+    // Use perfect flat transparency when we cannot fetch the correct pixel color for the refracted point
+    diffuseLighting = _GaussianPyramidColorTexture.SampleLevel(sampler_GaussianPyramidColorTexture, posInput.positionSS, 0.0).rgb;
+#endif
 }
 
 //-----------------------------------------------------------------------------
