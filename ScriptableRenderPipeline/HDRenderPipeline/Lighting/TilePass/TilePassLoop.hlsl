@@ -193,21 +193,75 @@ void LightLoop( float3 V, PositionInputs posInput, PreLightData preLightData, BS
     {
         #ifdef LIGHTLOOP_TILE_PASS
 
-        // TODO: Convert the for loop below to a while on each type as we know we are sorted and compare performance.
         uint punctualLightStart;
         uint punctualLightCount;
         GetCountAndStart(posInput, LIGHTCATEGORY_PUNCTUAL, punctualLightStart, punctualLightCount);
 
-        for (i = 0; i < punctualLightCount; ++i)
+        i = 0;
+        if (punctualLightCount > 0)
         {
-            float3 localDiffuseLighting, localSpecularLighting;
-            int punctualIndex = FetchIndex(punctualLightStart, i);
+            uint punctualIndex = FetchIndex(punctualLightStart, i);
+            uint lightType = _LightDatas[punctualIndex].lightType;
 
-            EvaluateBSDF_Punctual(  context, V, posInput, preLightData, _LightDatas[punctualIndex], bsdfData, _LightDatas[punctualIndex].lightType,
-                                    localDiffuseLighting, localSpecularLighting);
+            while (i < punctualLightCount && lightType == GPULIGHTTYPE_POINT)
+            {
+                float3 localDiffuseLighting, localSpecularLighting;
 
-            accLighting.punctualDiffuseLighting += localDiffuseLighting;
-            accLighting.punctualSpecularLighting += localSpecularLighting;
+                EvaluateBSDF_Punctual(  context, V, posInput, preLightData, _LightDatas[punctualIndex], bsdfData, GPULIGHTTYPE_POINT,
+                                        localDiffuseLighting, localSpecularLighting);
+
+                accLighting.punctualDiffuseLighting += localDiffuseLighting;
+                accLighting.punctualSpecularLighting += localSpecularLighting;
+
+                i++;
+                punctualIndex = i < punctualLightCount ? FetchIndex(punctualLightStart, i) : 0;
+                lightType = i < punctualLightCount ? _LightDatas[punctualIndex].lightType : 0xFF;
+            }
+
+            while (i < punctualLightCount && lightType == GPULIGHTTYPE_SPOT)
+            {
+                float3 localDiffuseLighting, localSpecularLighting;
+
+                EvaluateBSDF_Punctual(  context, V, posInput, preLightData, _LightDatas[punctualIndex], bsdfData, GPULIGHTTYPE_SPOT,
+                                        localDiffuseLighting, localSpecularLighting);
+
+                accLighting.punctualDiffuseLighting += localDiffuseLighting;
+                accLighting.punctualSpecularLighting += localSpecularLighting;
+
+                i++;
+                punctualIndex = i < punctualLightCount ? FetchIndex(punctualLightStart, i) : 0;
+                lightType = i < punctualLightCount ? _LightDatas[punctualIndex].lightType : 0xFF;
+            }
+
+            while (i < punctualLightCount && lightType == GPULIGHTTYPE_PROJECTOR_PYRAMID)
+            {
+                float3 localDiffuseLighting, localSpecularLighting;
+
+                EvaluateBSDF_Punctual(  context, V, posInput, preLightData, _LightDatas[punctualIndex], bsdfData, GPULIGHTTYPE_PROJECTOR_PYRAMID,
+                                        localDiffuseLighting, localSpecularLighting);
+
+                accLighting.punctualDiffuseLighting += localDiffuseLighting;
+                accLighting.punctualSpecularLighting += localSpecularLighting;
+
+                i++;
+                punctualIndex = i < punctualLightCount ? FetchIndex(punctualLightStart, i) : 0;
+                lightType = i < punctualLightCount ? _LightDatas[punctualIndex].lightType : 0xFF;
+            }
+
+            while (i < punctualLightCount && lightType == GPULIGHTTYPE_PROJECTOR_BOX)
+            {
+                float3 localDiffuseLighting, localSpecularLighting;
+
+                EvaluateBSDF_Punctual(  context, V, posInput, preLightData, _LightDatas[punctualIndex], bsdfData, GPULIGHTTYPE_PROJECTOR_BOX,
+                                        localDiffuseLighting, localSpecularLighting);
+
+                accLighting.punctualDiffuseLighting += localDiffuseLighting;
+                accLighting.punctualSpecularLighting += localSpecularLighting;
+
+                i++;
+                punctualIndex = i < punctualLightCount ? FetchIndex(punctualLightStart, i) : 0;
+                lightType = i < punctualLightCount ? _LightDatas[punctualIndex].lightType : 0xFF;
+            }
         }
 
         #else
