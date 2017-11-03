@@ -916,6 +916,21 @@ namespace UnityEngine.Experimental.Rendering.HDPipeline
                 // Value of max smoothness is from artists point of view, need to convert from perceptual smoothness to roughness
                 lightData.minRoughness = (1.0f - additionalLightData.maxSmoothness) * (1.0f - additionalLightData.maxSmoothness);
 
+                lightData.bakedOcclusionMask = Vector4.zero;
+
+                if (IsBakedShadowMaskLight(light.light))
+                {
+                    lightData.bakedOcclusionMask[light.light.bakingOutput.occlusionMaskChannel] = 1.0f;
+                    // TODO: make this option per light, not global
+                    lightData.dynamicShadowCasterOnly = QualitySettings.shadowmaskMode == ShadowmaskMode.Shadowmask;
+                }
+                else
+                {
+                    // use -1 to say that we don't use shadow mask
+                    lightData.bakedOcclusionMask.x = -1.0f;
+                    lightData.dynamicShadowCasterOnly = false;
+                }
+
                 m_lightList.lights.Add(lightData);
 
                 return true;
@@ -1209,8 +1224,19 @@ namespace UnityEngine.Experimental.Rendering.HDPipeline
                 m_ShadowMgr.UpdateCullingParameters( ref cullingParams );
             }
 
-            public void PrepareLightsForGPU(ShadowSettings shadowSettings, CullResults cullResults, Camera camera)
+            public bool IsBakedShadowMaskLight(Light light)
             {
+                return light.bakingOutput.lightmapBakeType == LightmapBakeType.Mixed &&
+                        light.bakingOutput.mixedLightingMode == MixedLightingMode.Shadowmask &&
+                        light.bakingOutput.occlusionMaskChannel != -1; // We need to have an occlusion mask channel assign, else we have no shadow mask
+            }
+
+            // Return true if BakedShadowMask are enabled
+            public bool PrepareLightsForGPU(ShadowSettings shadowSettings, CullResults cullResults, Camera camera)
+            {
+                // If any light require it, we need to enabled bake shadow mask feature
+                bool enableBakeShadowMask = false;
+
                 m_lightList.Clear();
 
                 Vector3 camPosWS = camera.transform.position;
@@ -1279,7 +1305,7 @@ namespace UnityEngine.Experimental.Rendering.HDPipeline
                         // Debug.Assert(additionalData == null, "Missing HDAdditionalData on a light - Should have been create by HDLightEditor");
 
                         if (additionalData == null)
-                            return;
+                            return false;
 
                         LightCategory lightCategory = LightCategory.Count;
                         GPULightType gpuLightType = GPULightType.Point;
@@ -1392,6 +1418,9 @@ namespace UnityEngine.Experimental.Rendering.HDPipeline
                         int lightIndex = (int)(sortKey & 0xFFFF);
 
                         var light = cullResults.visibleLights[lightIndex];
+
+                        enableBakeShadowMask = enableBakeShadowMask || IsBakedShadowMaskLight(light.light);
+
                         var additionalLightData = light.light.GetComponent<HDAdditionalLightData>();
                         var additionalShadowData = light.light.GetComponent<AdditionalShadowData>(); // Can be null
 
@@ -1532,6 +1561,8 @@ namespace UnityEngine.Experimental.Rendering.HDPipeline
                 Debug.Assert(m_lightList.lightVolumes.Count == m_lightCount);
 
                 UpdateDataBuffers();
+
+                return enableBakeShadowMask;
             }
 
             void VoxelLightListGeneration(CommandBuffer cmd, Camera camera, Matrix4x4 projscr, Matrix4x4 invProjscr, RenderTargetIdentifier cameraDepthBufferRT)
@@ -1719,6 +1750,8 @@ namespace UnityEngine.Experimental.Rendering.HDPipeline
                         cmd.SetComputeTextureParam(buildMaterialFlagsShader, buildMaterialFlagsKernel, HDShaderIDs._GBufferTexture1, HDShaderIDs._GBufferTexture1);
                         cmd.SetComputeTextureParam(buildMaterialFlagsShader, buildMaterialFlagsKernel, HDShaderIDs._GBufferTexture2, HDShaderIDs._GBufferTexture2);
                         cmd.SetComputeTextureParam(buildMaterialFlagsShader, buildMaterialFlagsKernel, HDShaderIDs._GBufferTexture3, HDShaderIDs._GBufferTexture3);
+                        cmd.SetComputeTextureParam(buildMaterialFlagsShader, buildMaterialFlagsKernel, HDShaderIDs._ShadowMaskTexture, HDShaderIDs._ShadowMaskTexture);
+                        cmd.SetComputeTextureParam(buildMaterialFlagsShader, buildMaterialFlagsKernel, HDShaderIDs._VelocityTexture, HDShaderIDs._VelocityTexture);
 
                         cmd.DispatchCompute(buildMaterialFlagsShader, buildMaterialFlagsKernel, numTilesX, numTilesY, 1);
                     }
@@ -2134,6 +2167,8 @@ namespace UnityEngine.Experimental.Rendering.HDPipeline
                                 cmd.SetComputeTextureParam(deferredComputeShader, kernel, HDShaderIDs._GBufferTexture1, HDShaderIDs._GBufferTexture1);
                                 cmd.SetComputeTextureParam(deferredComputeShader, kernel, HDShaderIDs._GBufferTexture2, HDShaderIDs._GBufferTexture2);
                                 cmd.SetComputeTextureParam(deferredComputeShader, kernel, HDShaderIDs._GBufferTexture3, HDShaderIDs._GBufferTexture3);
+                                cmd.SetComputeTextureParam(deferredComputeShader, kernel, HDShaderIDs._ShadowMaskTexture, HDShaderIDs._ShadowMaskTexture);
+                                cmd.SetComputeTextureParam(deferredComputeShader, kernel, HDShaderIDs._VelocityTexture, HDShaderIDs._VelocityTexture);
                                 cmd.SetComputeTextureParam(deferredComputeShader, kernel, HDShaderIDs._AmbientOcclusionTexture, HDShaderIDs._AmbientOcclusionTexture);
 
                                 cmd.SetComputeTextureParam(deferredComputeShader, kernel, HDShaderIDs._LtcData, ltcData);

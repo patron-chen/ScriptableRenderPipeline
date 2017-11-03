@@ -74,10 +74,11 @@ struct LightData
     float angleScale;
     float angleOffset;
     float shadowDimmer;
-    int unused0;
+    bool dynamicShadowCasterOnly;
     float2 size;
     int lightType;
     float minRoughness;
+    float4 bakedOcclusionMask;
 };
 
 // Generated from UnityEngine.Experimental.Rendering.HDPipeline.EnvLightData
@@ -197,9 +198,9 @@ float GetShadowDimmer(LightData value)
 {
 	return value.shadowDimmer;
 }
-int GetUnused0(LightData value)
+bool GetDynamicShadowCasterOnly(LightData value)
 {
-	return value.unused0;
+	return value.dynamicShadowCasterOnly;
 }
 float2 GetSize(LightData value)
 {
@@ -212,6 +213,10 @@ int GetLightType(LightData value)
 float GetMinRoughness(LightData value)
 {
 	return value.minRoughness;
+}
+float4 GetBakedOcclusionMask(LightData value)
+{
+	return value.bakedOcclusionMask;
 }
 
 //

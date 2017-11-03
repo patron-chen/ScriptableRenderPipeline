@@ -33,30 +33,40 @@ namespace UnityEngine.Experimental.Rendering.HDPipeline
 
         public int gbufferCount { get; set; }
 
-        int[] m_IDs = new int[k_MaxGbuffer];
         RenderTargetIdentifier[] m_ColorMRTs;
         RenderTargetIdentifier[] m_RTIDs = new RenderTargetIdentifier[k_MaxGbuffer];
-        RenderTextureFormat[] m_Formats = new RenderTextureFormat[k_MaxGbuffer];
-        RenderTextureReadWrite[] m_sRGBWrites = new RenderTextureReadWrite[k_MaxGbuffer];
 
-        public void SetBufferDescription(int index, string stringId, RenderTextureFormat inFormat, RenderTextureReadWrite inSRGBWrite)
+        public void InitGBuffers(int width, int height, RenderPipelineMaterial deferredMaterial, bool enableBakeShadowMask, CommandBuffer cmd)
         {
-            m_IDs[index] = Shader.PropertyToID(stringId);
-            m_RTIDs[index] = new RenderTargetIdentifier(m_IDs[index]);
-            m_Formats[index] = inFormat;
-            m_sRGBWrites[index] = inSRGBWrite;
-        }
+            // Init Gbuffer description
+            gbufferCount = deferredMaterial.GetMaterialGBufferCount();
+            RenderTextureFormat[] rtFormat;
+            RenderTextureReadWrite[] rtReadWrite;
+            deferredMaterial.GetMaterialGBufferDescription(out rtFormat, out rtReadWrite);
 
-        public void InitGBuffers(int width, int height, CommandBuffer cmd)
-        {
-            for (int index = 0; index < gbufferCount; index++)
+            for (int gbufferIndex = 0; gbufferIndex < gbufferCount; ++gbufferIndex)
             {
-                cmd.GetTemporaryRT(m_IDs[index], width, height, 0, FilterMode.Point, m_Formats[index], m_sRGBWrites[index]);
+                cmd.GetTemporaryRT(HDShaderIDs._GBufferTexture[gbufferIndex], width, height, 0, FilterMode.Point, rtFormat[gbufferIndex], rtReadWrite[gbufferIndex]);
+                m_RTIDs[gbufferIndex] = new RenderTargetIdentifier(HDShaderIDs._GBufferTexture[gbufferIndex]);
+            }
+
+            if (enableBakeShadowMask)
+            {
+                cmd.GetTemporaryRT(HDShaderIDs._ShadowMaskTexture, width, height, 0, FilterMode.Point, Builtin.GetShadowMaskBufferFormat(), Builtin.GetShadowMaskBufferReadWrite());
+                m_RTIDs[gbufferCount++] = new RenderTargetIdentifier(HDShaderIDs._ShadowMaskTexture);
+            }
+
+            if (ShaderConfig.s_VelocityInGbuffer == 1)
+            {
+                // If velocity is in GBuffer then it is in the last RT. Assign a different name to it.
+                cmd.GetTemporaryRT(HDShaderIDs._VelocityTexture, width, height, 0, FilterMode.Point, Builtin.GetVelocityBufferFormat(), Builtin.GetVelocityBufferReadWrite());
+                m_RTIDs[gbufferCount++] = new RenderTargetIdentifier(HDShaderIDs._VelocityTexture);
             }
         }
 
         public RenderTargetIdentifier[] GetGBuffers()
         {
+            // TODO: check with THomas or Tim if wa can simply return m_ColorMRTs with null for extra RT
             if (m_ColorMRTs == null || m_ColorMRTs.Length != gbufferCount)
                 m_ColorMRTs = new RenderTargetIdentifier[gbufferCount];
 
@@ -134,6 +144,7 @@ namespace UnityEngine.Experimental.Rendering.HDPipeline
         // Old SSS Model >>>
         readonly int m_CameraFilteringBuffer;
         // <<< Old SSS Model
+        readonly int m_ShadowMaskBuffer;
         readonly int m_VelocityBuffer;
         readonly int m_DistortionBuffer;
         readonly int m_GaussianPyramidColorBuffer;
@@ -166,7 +177,7 @@ namespace UnityEngine.Experimental.Rendering.HDPipeline
         RenderTargetIdentifier m_CameraStencilBufferCopyRT;
         RenderTargetIdentifier m_HTileRT;
 
-        // The pass "SRPDefaultUnlit" is a fallback to legacy unlit rendering and is required to support unity 2d + unity UI that render in the scene.
+        // The pass "SRPDefaultUnlit" is a fall back to legacy unlit rendering and is required to support unity 2d + unity UI that render in the scene.
         ShaderPassName[] m_ForwardAndForwardOnlyPassNames = { new ShaderPassName(), new ShaderPassName(), HDShaderPassNames.s_SRPDefaultUnlitName};
         ShaderPassName[] m_ForwardOnlyPassNames = { new ShaderPassName(), HDShaderPassNames.s_SRPDefaultUnlitName};
         ShaderPassName[] m_DepthOnlyAndDepthForwardOnlyPassNames = { HDShaderPassNames.s_DepthForwardOnlyName, HDShaderPassNames.s_DepthOnlyName };
@@ -301,24 +312,7 @@ namespace UnityEngine.Experimental.Rendering.HDPipeline
 
             InitializeDebugMaterials();
 
-            // Init Gbuffer description
-            m_GbufferManager.gbufferCount = m_DeferredMaterial.GetMaterialGBufferCount();
-            RenderTextureFormat[] rtFormat;
-            RenderTextureReadWrite[] rtReadWrite;
-            m_DeferredMaterial.GetMaterialGBufferDescription(out rtFormat, out rtReadWrite);
-
-            for (int gbufferIndex = 0; gbufferIndex < m_GbufferManager.gbufferCount; ++gbufferIndex)
-            {
-                m_GbufferManager.SetBufferDescription(gbufferIndex, "_GBufferTexture" + gbufferIndex, rtFormat[gbufferIndex], rtReadWrite[gbufferIndex]);
-            }
-
             m_VelocityBuffer = HDShaderIDs._VelocityTexture;
-            if (ShaderConfig.s_VelocityInGbuffer == 1)
-            {
-                // If velocity is in GBuffer then it is in the last RT. Assign a different name to it.
-                m_GbufferManager.SetBufferDescription(m_GbufferManager.gbufferCount, "_VelocityTexture", Builtin.GetVelocityBufferFormat(), Builtin.GetVelocityBufferReadWrite());
-                m_GbufferManager.gbufferCount++;
-            }
             m_VelocityBufferRT = new RenderTargetIdentifier(m_VelocityBuffer);
 
             m_DistortionBuffer = HDShaderIDs._DistortionTexture;
@@ -765,11 +759,14 @@ namespace UnityEngine.Experimental.Rendering.HDPipeline
                 return;
             }
 
-            // The first thing to do is to go through all lights on the CPU side and prepare light for GPU.
-            // This allow us to deal with the flexibility of shadow mask that will do a GBuffer allocation on demand (in case of deferred rendering)
-            m_LightLoop.PrepareLightsForGPU(m_ShadowSettings, m_CullResults, camera);
-
-            InitAndClearBuffer(hdCamera, cmd);
+            // Note: Legacy Unity behave like this for ShadowMask
+            // When you select ShadowMask in Lighting panel it recompile shaders on the fly with the SHADOW_MASK keyword.
+            // However there is no C# function that we can query to know what mode have been select in Lighting Panel and it will be wrong anyway. Lighting Panel setup what will be the next bake mode. But until light is bake, it is wrong.
+            // Currently to know if you need shadow mask you need to go through all visible lights (of CullResult), check the LightBakingOutput struct and look at lightmapBakeType/mixedLightingMode. If one light have shadow mask bake mode, then you need shadow mask features (i.e extra Gbuffer).
+            // It mean that when we build a standalone player, if we detect a light with bake shadow mask, we generate all shader variant (with and without shadow mask) and at runtime, when a bake shadow mask light is visible, we dynamically allocate an extra GBuffer and switch the shader.
+            // So the first thing to do is to go through all the light: PrepareLightsForGPU
+            bool enableBakeShadowMask = m_LightLoop.PrepareLightsForGPU(m_ShadowSettings, m_CullResults, camera);
+            InitAndClearBuffer(hdCamera, enableBakeShadowMask, cmd);
 
             RenderDepthPrepass(m_CullResults, camera, renderContext, cmd);
 
@@ -1612,7 +1609,7 @@ namespace UnityEngine.Experimental.Rendering.HDPipeline
             }
         }
 
-        void InitAndClearBuffer(HDCamera camera, CommandBuffer cmd)
+        void InitAndClearBuffer(HDCamera camera, bool enableBakeShadowMask, CommandBuffer cmd)
         {
             using (new ProfilingSample(cmd, "InitAndClearBuffer"))
             {
@@ -1647,7 +1644,7 @@ namespace UnityEngine.Experimental.Rendering.HDPipeline
                     // End
 
                     if (!m_Asset.renderingSettings.ShouldUseForwardRenderingOnly())
-                        m_GbufferManager.InitGBuffers(w, h, cmd);
+                        m_GbufferManager.InitGBuffers(w, h, m_DeferredMaterial, enableBakeShadowMask, cmd);
 
                     CoreUtils.SetRenderTarget(cmd, m_CameraColorBufferRT, m_CameraDepthStencilBufferRT, ClearFlag.Depth);
                 }
