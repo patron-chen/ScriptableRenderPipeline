@@ -150,6 +150,14 @@ namespace UnityEngine.Experimental.Rendering
             return mat;
         }
 
+        public static void SetKeyword(CommandBuffer cmd, string keyword, bool state)
+        {
+            if (state)
+                cmd.EnableShaderKeyword(keyword);
+            else
+                cmd.DisableShaderKeyword(keyword);
+        }
+
         public static void SetKeyword(Material m, string keyword, bool state)
         {
             if (state)

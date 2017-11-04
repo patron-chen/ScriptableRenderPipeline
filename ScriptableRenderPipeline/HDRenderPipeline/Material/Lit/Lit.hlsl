@@ -1375,7 +1375,7 @@ DirectLighting EvaluateBSDF_Punctual(   LightLoopContext lightLoopContext,
     [branch] if (lightData.bakedOcclusionMask.x >= 0.0) // bakedOcclusionMask.x is -1 if there is no shadow mask
     {
         // Note that we override shadow value (in case we don't have any dynamic shadow)
-        shadow = shadowMask = dot(lightLoopContext.shadowMask, lightData.bakedOcclusionMask);
+        shadow = shadowMask = dot(bakeLightingData.bakeShadowMask, lightData.bakedOcclusionMask);
     }
 #endif
 

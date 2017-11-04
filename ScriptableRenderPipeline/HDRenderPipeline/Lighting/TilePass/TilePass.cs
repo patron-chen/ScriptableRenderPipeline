@@ -352,6 +352,7 @@ namespace UnityEngine.Experimental.Rendering.HDPipeline
             int m_punctualLightCount = 0;
             int m_areaLightCount = 0;
             int m_lightCount = 0;
+            bool m_enableBakeShadowMask = false; // Track if any light require shadow mask. In this case we will need to enable the keyword shadow mask
 
             private ComputeShader buildScreenAABBShader { get { return m_Resources.buildScreenAABBShader; } }
             private ComputeShader buildPerTileLightListShader { get { return m_Resources.buildPerTileLightListShader; } }
@@ -373,13 +374,21 @@ namespace UnityEngine.Experimental.Rendering.HDPipeline
             static int s_BuildDispatchIndirectKernel;
             static int s_BuildMaterialFlagsWriteKernel;
             static int s_BuildMaterialFlagsOrKernel;
+
             static int s_shadeOpaqueDirectClusteredKernel;
             static int s_shadeOpaqueDirectFptlKernel;
             static int s_shadeOpaqueDirectClusteredDebugDisplayKernel;
             static int s_shadeOpaqueDirectFptlDebugDisplayKernel;
+
+            static int s_shadeOpaqueDirectShadowMaskClusteredKernel;
+            static int s_shadeOpaqueDirectShadowMaskFptlKernel;
+            static int s_shadeOpaqueDirectShadowMaskClusteredDebugDisplayKernel;
+            static int s_shadeOpaqueDirectShadowMaskFptlDebugDisplayKernel;
+
             // Tag: SUPPORT_COMPUTE_CLUSTER_OPAQUE - Uncomment this if you want to do cluster opaque with compute shader (by default we support only fptl on opaque)
             //static int[] s_shadeOpaqueIndirectClusteredKernels = new int[LightDefinitions.s_NumFeatureVariants];
             static int[] s_shadeOpaqueIndirectFptlKernels = new int[LightDefinitions.s_NumFeatureVariants];
+            static int[] s_shadeOpaqueIndirectShadowMaskFptlKernels = new int[LightDefinitions.s_NumFeatureVariants];
 
             static int s_deferredDirectionalShadowKernel;
 
@@ -544,6 +553,11 @@ namespace UnityEngine.Experimental.Rendering.HDPipeline
                 s_shadeOpaqueDirectClusteredDebugDisplayKernel = deferredComputeShader.FindKernel("Deferred_Direct_Clustered_DebugDisplay");
                 s_shadeOpaqueDirectFptlDebugDisplayKernel = deferredComputeShader.FindKernel("Deferred_Direct_Fptl_DebugDisplay");
 
+                s_shadeOpaqueDirectShadowMaskClusteredKernel = deferredComputeShader.FindKernel("Deferred_Direct_ShadowMask_Clustered");
+                s_shadeOpaqueDirectShadowMaskFptlKernel = deferredComputeShader.FindKernel("Deferred_Direct_ShadowMask_Fptl");
+                s_shadeOpaqueDirectShadowMaskClusteredDebugDisplayKernel = deferredComputeShader.FindKernel("Deferred_Direct_ShadowMask_Clustered_DebugDisplay");
+                s_shadeOpaqueDirectShadowMaskFptlDebugDisplayKernel = deferredComputeShader.FindKernel("Deferred_Direct_ShadowMask_Fptl_DebugDisplay");
+
                 s_deferredDirectionalShadowKernel = deferredDirectionalShadowComputeShader.FindKernel("DeferredDirectionalShadow");
 
                 for (int variant = 0; variant < LightDefinitions.s_NumFeatureVariants; variant++)
@@ -551,6 +565,7 @@ namespace UnityEngine.Experimental.Rendering.HDPipeline
                     // Tag: SUPPORT_CLUSTER_OPAQUE - Uncomment this if you want to do cluster opaque (by default we support only fptl on opaque)
                     // s_shadeOpaqueIndirectClusteredKernels[variant] = deferredComputeShader.FindKernel("Deferred_Indirect_Clustered_Variant" + variant);
                     s_shadeOpaqueIndirectFptlKernels[variant] = deferredComputeShader.FindKernel("Deferred_Indirect_Fptl_Variant" + variant);
+                    s_shadeOpaqueIndirectShadowMaskFptlKernels[variant] = deferredComputeShader.FindKernel("Deferred_Indirect_ShadowMask_Fptl_Variant" + variant);
                 }
 
                 s_LightList = null;
@@ -1235,7 +1250,7 @@ namespace UnityEngine.Experimental.Rendering.HDPipeline
             public bool PrepareLightsForGPU(ShadowSettings shadowSettings, CullResults cullResults, Camera camera)
             {
                 // If any light require it, we need to enabled bake shadow mask feature
-                bool enableBakeShadowMask = false;
+                m_enableBakeShadowMask = false;
 
                 m_lightList.Clear();
 
@@ -1419,7 +1434,7 @@ namespace UnityEngine.Experimental.Rendering.HDPipeline
 
                         var light = cullResults.visibleLights[lightIndex];
 
-                        enableBakeShadowMask = enableBakeShadowMask || IsBakedShadowMaskLight(light.light);
+                        m_enableBakeShadowMask = m_enableBakeShadowMask || IsBakedShadowMaskLight(light.light);
 
                         var additionalLightData = light.light.GetComponent<HDAdditionalLightData>();
                         var additionalShadowData = light.light.GetComponent<AdditionalShadowData>(); // Can be null
@@ -1562,7 +1577,7 @@ namespace UnityEngine.Experimental.Rendering.HDPipeline
 
                 UpdateDataBuffers();
 
-                return enableBakeShadowMask;
+                return m_enableBakeShadowMask;
             }
 
             void VoxelLightListGeneration(CommandBuffer cmd, Camera camera, Matrix4x4 projscr, Matrix4x4 invProjscr, RenderTargetIdentifier cameraDepthBufferRT)
@@ -2054,6 +2069,7 @@ namespace UnityEngine.Experimental.Rendering.HDPipeline
                         // This is a debug brute force renderer to debug tile/cluster which render all the lights
                         if (options.outputSplitLighting)
                         {
+                            CoreUtils.SetKeyword(m_SingleDeferredMaterialMRT, "SHADOWS_SHADOWMASK", m_enableBakeShadowMask);
                             CoreUtils.DrawFullScreen(cmd, m_SingleDeferredMaterialMRT, colorBuffers, depthStencilBuffer);
                         }
                         else
@@ -2070,6 +2086,7 @@ namespace UnityEngine.Experimental.Rendering.HDPipeline
                                 m_SingleDeferredMaterialSRT.SetInt(HDShaderIDs._StencilCmp, (int)CompareFunction.Equal);
                             }
 
+                            CoreUtils.SetKeyword(m_SingleDeferredMaterialSRT, "SHADOWS_SHADOWMASK", m_enableBakeShadowMask);
                             CoreUtils.DrawFullScreen(cmd, m_SingleDeferredMaterialSRT, colorBuffers[0], depthStencilBuffer);
                         }
                     }
@@ -2128,19 +2145,28 @@ namespace UnityEngine.Experimental.Rendering.HDPipeline
 
                                 if (enableFeatureVariants)
                                 {
-                                    // Tag: SUPPORT_COMPUTE_CLUSTER_OPAQUE - Uncomment this if you want to do cluster opaque with compute shader (by default we support only fptl on opaque)
+                                    // Tag: SUPPORT_COMPUTE_CLUSTER_OPAQUE - Update the code with following comment this if you want to do cluster opaque with compute shader (by default we support only fptl on opaque)
                                     // kernel = usingFptl ? s_shadeOpaqueIndirectFptlKernels[variant] : s_shadeOpaqueIndirectClusteredKernels[variant];
-                                    kernel = s_shadeOpaqueIndirectFptlKernels[variant];
+                                    if (m_enableBakeShadowMask)
+                                        kernel = s_shadeOpaqueIndirectShadowMaskFptlKernels[variant];
+                                    else
+                                        kernel = s_shadeOpaqueIndirectFptlKernels[variant];
                                 }
                                 else
                                 {
-                                    if (debugDisplaySettings.IsDebugDisplayEnabled())
+                                    if (m_enableBakeShadowMask)
                                     {
-                                        kernel = usingFptl ? s_shadeOpaqueDirectFptlDebugDisplayKernel : s_shadeOpaqueDirectClusteredDebugDisplayKernel;
+                                        if (debugDisplaySettings.IsDebugDisplayEnabled())
+                                            kernel = usingFptl ? s_shadeOpaqueDirectFptlDebugDisplayKernel : s_shadeOpaqueDirectClusteredDebugDisplayKernel;
+                                        else
+                                            kernel = usingFptl ? s_shadeOpaqueDirectFptlKernel : s_shadeOpaqueDirectClusteredKernel;
                                     }
                                     else
                                     {
-                                        kernel = usingFptl ? s_shadeOpaqueDirectFptlKernel : s_shadeOpaqueDirectClusteredKernel;
+                                        if (debugDisplaySettings.IsDebugDisplayEnabled())
+                                            kernel = usingFptl ? s_shadeOpaqueDirectShadowMaskFptlDebugDisplayKernel : s_shadeOpaqueDirectShadowMaskClusteredDebugDisplayKernel;
+                                        else
+                                            kernel = usingFptl ? s_shadeOpaqueDirectShadowMaskFptlKernel : s_shadeOpaqueDirectShadowMaskClusteredKernel;
                                     }
                                 }
 
@@ -2224,6 +2250,7 @@ namespace UnityEngine.Experimental.Rendering.HDPipeline
 
                             if (options.outputSplitLighting)
                             {
+                                CoreUtils.SetKeyword(m_DeferredAllMaterialMRT, "SHADOWS_SHADOWMASK", m_enableBakeShadowMask);
                                 CoreUtils.SelectKeyword(m_DeferredAllMaterialMRT, "USE_CLUSTERED_LIGHTLIST", "USE_FPTL_LIGHTLIST", bUseClusteredForDeferred);
                                 CoreUtils.DrawFullScreen(cmd, m_DeferredAllMaterialMRT, colorBuffers, depthStencilBuffer);
                             }
@@ -2241,6 +2268,7 @@ namespace UnityEngine.Experimental.Rendering.HDPipeline
                                     m_DeferredAllMaterialSRT.SetInt(HDShaderIDs._StencilCmp, (int)CompareFunction.Equal);
                                 }
 
+                                CoreUtils.SetKeyword(m_DeferredAllMaterialSRT, "SHADOWS_SHADOWMASK", m_enableBakeShadowMask);
                                 CoreUtils.SelectKeyword(m_DeferredAllMaterialSRT, "USE_CLUSTERED_LIGHTLIST", "USE_FPTL_LIGHTLIST", bUseClusteredForDeferred);
                                 CoreUtils.DrawFullScreen(cmd, m_DeferredAllMaterialSRT, colorBuffers[0], depthStencilBuffer);
                             }
@@ -2254,6 +2282,8 @@ namespace UnityEngine.Experimental.Rendering.HDPipeline
             public void RenderForward(Camera camera, CommandBuffer cmd, bool renderOpaque)
             {
                 PushGlobalParams(camera, cmd, null, 0);
+
+                CoreUtils.SetKeyword(cmd, "SHADOWS_SHADOWMASK", m_enableBakeShadowMask);
 
                 // Note: if we use render opaque with deferred tiling we need to render a opaque depth pass for these opaque objects
                 if (!m_TileSettings.enableTileAndCluster)
