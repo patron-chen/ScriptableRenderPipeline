@@ -128,7 +128,7 @@ CBUFFER_START(UnityDeferredCompute)
 	uint g_TileListOffset;
 CBUFFER_END
 
-#if USE_INDIRECT
+#ifdef USE_INDIRECT
 
 StructuredBuffer<uint> g_TileList;
 // Indirect
