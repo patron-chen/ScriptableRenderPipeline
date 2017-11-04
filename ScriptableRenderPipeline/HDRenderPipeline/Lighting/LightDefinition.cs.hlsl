@@ -55,6 +55,11 @@ struct DirectionalLightData
     float specularScale;
     float3 up;
     float diffuseScale;
+    bool dynamicShadowCasterOnly;
+    float shadowDimmer;
+    float unused0;
+    float unused1;
+    float4 bakedOcclusionMask;
 };
 
 // Generated from UnityEngine.Experimental.Rendering.HDPipeline.LightData
@@ -141,6 +146,26 @@ float3 GetUp(DirectionalLightData value)
 float GetDiffuseScale(DirectionalLightData value)
 {
 	return value.diffuseScale;
+}
+bool GetDynamicShadowCasterOnly(DirectionalLightData value)
+{
+	return value.dynamicShadowCasterOnly;
+}
+float GetShadowDimmer(DirectionalLightData value)
+{
+	return value.shadowDimmer;
+}
+float GetUnused0(DirectionalLightData value)
+{
+	return value.unused0;
+}
+float GetUnused1(DirectionalLightData value)
+{
+	return value.unused1;
+}
+float4 GetBakedOcclusionMask(DirectionalLightData value)
+{
+	return value.bakedOcclusionMask;
 }
 
 //

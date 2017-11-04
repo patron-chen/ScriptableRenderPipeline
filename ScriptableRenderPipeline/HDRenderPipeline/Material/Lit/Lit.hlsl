@@ -1236,7 +1236,16 @@ DirectLighting EvaluateBSDF_Directional(    LightLoopContext lightLoopContext,
     float NdotL = dot(bsdfData.normalWS, L);
     float illuminance = saturate(NdotL);
 
-    float shadow     = 1.0;
+    float shadow = 1.0;
+    float shadowMask = 1.0;
+
+#ifdef SHADOWS_SHADOWMASK
+    [branch] if (lightData.bakedOcclusionMask.x >= 0.0) // bakedOcclusionMask.x is -1 if there is no shadow mask
+    {
+        // Note that we override shadow value (in case we don't have any dynamic shadow)
+        shadow = shadowMask = dot(bakeLightingData.bakeShadowMask, lightData.bakedOcclusionMask);
+    }
+#endif
 
     [branch] if (lightData.shadowIndex >= 0)
     {
@@ -1245,8 +1254,23 @@ DirectLighting EvaluateBSDF_Directional(    LightLoopContext lightLoopContext,
 #else
         shadow = LOAD_TEXTURE2D(_DeferredShadowTexture, posInput.unPositionSS).x;
 #endif
-        illuminance *= shadow;
+
+#ifdef SHADOWS_SHADOWMASK
+        // TODO: Make directional work by calculating shadow distance fading + be sure last cascade transition is not done.
+        //float sphereDist = distance(wpos, unity_ShadowFadeCenterAndType.xyz);
+        //float fadeDist = lerp(z, sphereDist, unity_ShadowFadeCenterAndType.w);
+        //float fade = saturate(fadeDist * _LightShadowData.z + _LightShadowData.w);
+        float fade = 1.0;
+
+        // See comment in EvaluateBSDF_Punctual
+        shadow = lightData.dynamicShadowCasterOnly ? min(shadowMask, shadow) : shadow;
+        shadow = lerp(shadow, shadowMask, fade); // Caution to lerp parameter: fade is the reverse of shadowDimmer
+
+        // Note: There is no shadowDimmer when there is no shadow mask
+#endif
     }
+
+    illuminance *= shadow;
 
     [branch] if (lightData.cookieIndex >= 0)
     {
@@ -1391,8 +1415,8 @@ DirectLighting EvaluateBSDF_Punctual(   LightLoopContext lightLoopContext,
         // HDRenderPipeline change this behavior. Only ShadowMask mode is supported but we support both blend with distance AND minimun of both value. Distance is control by light.
         // The following code do this.
         // The min handle the case of having only dynamic objects in the ShadowMap
-        // The second case for blend with distance is handlded with ShadowDimmer. ShadowDimmer is define manually and by shadowDistance by light.
-        // With distance, ShadowDimmer become one and only the ShadowMask appea, we get the blend with distance behavior.
+        // The second case for blend with distance is handled with ShadowDimmer. ShadowDimmer is define manually and by shadowDistance by light.
+        // With distance, ShadowDimmer become one and only the ShadowMask appear, we get the blend with distance behavior.
         shadow = lightData.dynamicShadowCasterOnly ? min(shadowMask, shadow) : shadow;
         shadow = lerp(shadowMask, shadow, lightData.shadowDimmer);
 #else

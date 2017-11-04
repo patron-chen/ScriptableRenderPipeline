@@ -792,6 +792,22 @@ namespace UnityEngine.Experimental.Rendering.HDPipeline
                     m_CurrentSunLight = light.light;
                     m_CurrentSunLightShadowIndex = shadowIdx;
                 }
+
+                directionalLightData.bakedOcclusionMask = Vector4.zero;
+
+                if (IsBakedShadowMaskLight(light.light))
+                {
+                    directionalLightData.bakedOcclusionMask[light.light.bakingOutput.occlusionMaskChannel] = 1.0f;
+                    // TODO: make this option per light, not global
+                    directionalLightData.dynamicShadowCasterOnly = QualitySettings.shadowmaskMode == ShadowmaskMode.Shadowmask;
+                }
+                else
+                {
+                    // use -1 to say that we don't use shadow mask
+                    directionalLightData.bakedOcclusionMask.x = -1.0f;
+                    directionalLightData.dynamicShadowCasterOnly = false;
+                }
+
                 m_CurrentSunLight = m_CurrentSunLight == null ? light.light : m_CurrentSunLight;
 
                 m_lightList.directionalLights.Add(directionalLightData);

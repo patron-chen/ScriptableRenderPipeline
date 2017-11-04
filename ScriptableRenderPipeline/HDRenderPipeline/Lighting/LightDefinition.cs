@@ -50,6 +50,13 @@ namespace UnityEngine.Experimental.Rendering.HDPipeline
 
         public Vector3 up;      // Rescaled by (2 / shapeWidth)
         public float diffuseScale;
+
+        public bool dynamicShadowCasterOnly; // Use with ShadowMask feature
+        public float unused0; // Use with ShadowMask feature
+        public float unused1;
+        public float unused2;
+
+        public Vector4 bakedOcclusionMask; // Use with ShadowMask feature
     };
 
     [GenerateHLSL]
