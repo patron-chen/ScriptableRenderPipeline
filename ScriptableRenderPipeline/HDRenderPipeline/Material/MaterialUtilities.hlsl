@@ -79,6 +79,7 @@ float4 SampleShadowMask(float3 positionWS, float2 uvStaticLightmap) // normalWS 
     }
     else
     {
+        // Note: Default value when the feature is not enabled is float(1.0, 1.0, 1.0, 1.0) in C++
         rawOcclusionMask = unity_ProbesOcclusion;
     }
 #endif
