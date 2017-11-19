@@ -437,6 +437,32 @@ BSDFData ConvertSurfaceDataToBSDFData(SurfaceData surfaceData)
 // conversion function for deferred
 //-----------------------------------------------------------------------------
 
+#define ENCODE_BASECOLOR_WITH_YCOCG
+
+float3 RGB2YCoCg(float3 c)
+{
+	return float3( 0.25*c.r+0.5*c.g+0.25*c.b, 0.5*c.r-0.5*c.b, -0.25*c.r+0.5*c.g-0.25*c.b);
+}
+
+float3 YCoCg2RGB(float3 c)
+{
+	return float3(c.r + c.g - c.b, c.r + c.b, c.r - c.g - c.b);
+}
+
+float edgeFilter(float2 center, float2 a0, float2 a1, float2 a2, float2 a3)
+{
+	float4 lum = float4(a0.x, a1.x, a2.x, a3.x);
+	float4 w = 1.0f - step(30.0f / 255.0f, abs(lum - center.x));
+	float W = w.x + w.y + w.z + w.w;
+	//Handle the special case where all the weights are zero.
+	//In HDR scenes it's better to set the chrominance to zero.
+	//Here we just use the chrominance of the first neighbor.
+	w.x = (W == 0) ? 1 : w.x;
+	W = (W == 0) ? 1 : W;
+
+	return (w.x * a0.y + w.y* a1.y + w.z* a2.y + w.w * a3.y) / W;
+}
+
 // Encode SurfaceData (BSDF parameters) into GBuffer
 // Must be in sync with RT declared in HDRenderPipeline.cs ::Rebuild
 void EncodeIntoGBuffer( SurfaceData surfaceData,
@@ -459,7 +485,12 @@ void EncodeIntoGBuffer( SurfaceData surfaceData,
     ApplyDebugToSurfaceData(surfaceData);
 
     // RT0 - 8:8:8:8 sRGB
+#ifdef ...
+    float3 YCoCg = RGB2YCoCg(surfaceData.baseColor);
+    outGBuffer0 = float4((crd.x & 1) == (crd.y & 1) ? YCoCg.rb : YCoCg.rg, 0.0f, surfaceData.specularOcclusion);
+#else
     outGBuffer0 = float4(surfaceData.baseColor, surfaceData.specularOcclusion);
+#endif
 
     // RT1 - 10:10:10:2
     // We store perceptualRoughness instead of roughness because it save a sqrt ALU when decoding
@@ -580,6 +611,13 @@ void DecodeFromGBuffer(
     inGBuffer3.w = 0.0;
 #endif
 
+#if
+    float2 a0 = tex2D(_MainTex, i.uv + float2(_MainTex_TexelSize.x, 0)).rg;
+	float2 a1 = tex2D(_MainTex, i.uv - float2(_MainTex_TexelSize.x, 0)).rg;
+	float2 a2 = tex2D(_MainTex, i.uv + float2(0, _MainTex_TexelSize.y)).rg;
+	float2 a3 = tex2D(_MainTex, i.uv - float2(0, _MainTex_TexelSize.y)).rg;
+	chroma = edgeFilter(col.rb, a0, a1, a2, a3);
+#endif
     float3 baseColor = inGBuffer0.rgb;
     bsdfData.specularOcclusion = inGBuffer0.a;
 
