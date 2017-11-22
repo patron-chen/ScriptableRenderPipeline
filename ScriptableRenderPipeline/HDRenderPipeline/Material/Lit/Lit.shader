@@ -82,6 +82,14 @@ Shader "HDRenderPipeline/Lit"
         [ToggleOff]  _AlphaCutoffEnable("Alpha Cutoff Enable", Float) = 0.0
         _AlphaCutoff("Alpha Cutoff", Range(0.0, 1.0)) = 0.5
 
+        _AlphaCutoffShadow("_AlphaCutoffShadow", Range(0.0, 1.0)) = 0.5
+        _AlphaCutoffPrepass("_AlphaCutoffPrepass", Range(0.0, 1.0)) = 0.5
+        _AlphaCutoffPostpass("_AlphaCutoffPostpass", Range(0.0, 1.0)) = 0.5
+
+        [ToggleOff] _TransparentDepthPrepassEnable("_TransparentDepthPrepassEnable", Float) = 0.0
+        [ToggleOff] _TransparentDepthPostpassEnable("_TransparentDepthPostpassEnable", Float) = 0.0
+        [ToggleOff] _TransparentBackfaceEnable("_TransparentBackfaceEnable", Float) = 0.0
+
         // Transparency
         [Enum(None, 0, Plane, 1, Sphere, 2)]_RefractionMode("Refraction Mode", Int) = 0
         _IOR("Indice Of Refraction", Range(1.0, 2.5)) = 1.0
@@ -378,6 +386,7 @@ Shader "HDRenderPipeline/Lit"
 
             HLSLPROGRAM
 
+            #define CUTOFF_TRANSPARENT_SHADOW
             #define SHADERPASS SHADERPASS_SHADOWS
             #define USE_LEGACY_UNITY_MATRIX_VARIABLES
             #include "../../ShaderVariables.hlsl"
@@ -454,6 +463,92 @@ Shader "HDRenderPipeline/Lit"
             ENDHLSL
         }
 
+        // Caution: Order of pass mater. It should be:
+        // TransparentDepthPrepass, TransparentBackface, Forward/ForwardOnly, TransparentDepthPostpass
+        Pass
+        {
+            Name "TransparentDepthPrepass"
+            Tags{ "LightMode" = "TransparentDepthPrepass" }
+
+            Cull[_CullMode]
+
+            ZWrite On
+
+            ColorMask 0
+
+            HLSLPROGRAM
+
+            #define SHADERPASS SHADERPASS_DEPTH_ONLY
+            #define CUTOFF_TRANSPARENT_DEPTH_PREPASS
+            #include "../../ShaderVariables.hlsl"
+            #include "../../Material/Material.hlsl"
+            #include "ShaderPass/LitDepthPass.hlsl"
+            #include "LitData.hlsl"
+            #include "../../ShaderPass/ShaderPassDepthOnly.hlsl"
+
+            ENDHLSL
+        }
+
+        Pass
+        {
+            Name "TransparentBackface"
+            Tags { "LightMode" = "TransparentBackface" }
+
+            Blend [_SrcBlend] [_DstBlend]
+            ZWrite [_ZWrite]
+            Cull Front
+
+            HLSLPROGRAM
+
+            #pragma multi_compile LIGHTMAP_OFF LIGHTMAP_ON
+            #pragma multi_compile DIRLIGHTMAP_OFF DIRLIGHTMAP_COMBINED
+            #pragma multi_compile DYNAMICLIGHTMAP_OFF DYNAMICLIGHTMAP_ON
+            #pragma multi_compile _ SHADOWS_SHADOWMASK
+            // #include "../../Lighting/Forward.hlsl"
+            #pragma multi_compile LIGHTLOOP_SINGLE_PASS LIGHTLOOP_TILE_PASS
+            #pragma multi_compile USE_FPTL_LIGHTLIST USE_CLUSTERED_LIGHTLIST
+
+            #define SHADERPASS SHADERPASS_FORWARD
+            #include "../../ShaderVariables.hlsl"
+            #include "../../Lighting/Lighting.hlsl"
+            #include "ShaderPass/LitSharePass.hlsl"
+            #include "LitData.hlsl"
+            #include "../../ShaderPass/ShaderPassForward.hlsl"
+
+            ENDHLSL
+        }
+
+        Pass
+        {
+            Name "TransparentBackfaceDebugDisplay"
+            Tags { "LightMode" = "TransparentBackfaceDebugDisplay" }
+
+            Blend [_SrcBlend] [_DstBlend]
+            ZWrite [_ZWrite]
+            Cull Front
+
+            HLSLPROGRAM
+
+            #pragma multi_compile LIGHTMAP_OFF LIGHTMAP_ON
+            #pragma multi_compile DIRLIGHTMAP_OFF DIRLIGHTMAP_COMBINED
+            #pragma multi_compile DYNAMICLIGHTMAP_OFF DYNAMICLIGHTMAP_ON
+            #pragma multi_compile _ SHADOWS_SHADOWMASK
+            // #include "../../Lighting/Forward.hlsl"
+            #pragma multi_compile LIGHTLOOP_SINGLE_PASS LIGHTLOOP_TILE_PASS
+            #pragma multi_compile USE_FPTL_LIGHTLIST USE_CLUSTERED_LIGHTLIST
+
+            #define DEBUG_DISPLAY
+            #define SHADERPASS SHADERPASS_FORWARD
+            #include "../../ShaderVariables.hlsl"
+            #include "../../Debug/DebugDisplay.hlsl"
+            #include "../../Lighting/Lighting.hlsl"
+            #include "ShaderPass/LitSharePass.hlsl"
+            #include "LitData.hlsl"
+            #include "../../ShaderPass/ShaderPassForward.hlsl"
+
+            ENDHLSL
+        }
+
         Pass
         {
             Name "Forward" // Name is not used
@@ -510,6 +605,30 @@ Shader "HDRenderPipeline/Lit"
             #include "ShaderPass/LitSharePass.hlsl"
             #include "LitData.hlsl"
             #include "../../ShaderPass/ShaderPassForward.hlsl"
+
+            ENDHLSL
+        }
+
+        Pass
+        {
+            Name "TransparentDepthPostPass"
+            Tags{ "LightMode" = "TransparentDepthPostPass" }
+
+            Cull[_CullMode]
+
+            ZWrite On
+
+            ColorMask 0
+
+            HLSLPROGRAM
+
+            #define SHADERPASS SHADERPASS_DEPTH_ONLY
+            #define CUTOFF_TRANSPARENT_DEPTH_POSTPASS
+            #include "../../ShaderVariables.hlsl"
+            #include "../../Material/Material.hlsl"
+            #include "ShaderPass/LitDepthPass.hlsl"
+            #include "LitData.hlsl"
+            #include "../../ShaderPass/ShaderPassDepthOnly.hlsl"
 
             ENDHLSL
         }

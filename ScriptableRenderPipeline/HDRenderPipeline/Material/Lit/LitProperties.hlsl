@@ -92,6 +92,10 @@ CBUFFER_START(_PerMaterial)
 
 // shared constant between lit and layered lit
 float _AlphaCutoff;
+float _AlphaCutoffShadow;
+float _AlphaCutoffPrepass;
+float _AlphaCutoffPostpass;
+
 float4 _DoubleSidedConstants;
 float _DistortionScale;
 float _DistortionVectorScale;
