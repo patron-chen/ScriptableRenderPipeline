@@ -384,7 +384,6 @@ Shader "HDRenderPipeline/Lit"
             ZWrite On
             ZTest LEqual
 
-            // When alpha test is enabled, we should not write into the color buffer
             ColorMask 0
 
             HLSLPROGRAM
@@ -410,7 +409,6 @@ Shader "HDRenderPipeline/Lit"
 
             ZWrite On
 
-            // When alpha test is enabled, we should not write into the color buffer
             ColorMask 0
 
             HLSLPROGRAM
