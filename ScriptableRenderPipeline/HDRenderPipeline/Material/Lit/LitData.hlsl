@@ -254,9 +254,25 @@ void GetSurfaceAndBuiltinData(FragInputs input, float3 V, inout PositionInputs p
     float alpha = GetSurfaceData(input, layerTexCoord, surfaceData, normalTS, bentNormalTS);
     GetNormalWS(input, V, normalTS, surfaceData.normalWS);
 
-    // Ensure that the normal is front-facing.
+    // To reduce artifact related to normal not front-facing (often happening during BRDF evaluation) call GetViewReflectedNormal
+    // Don't do this if we are in DoubleSidedMode none  
     float NdotV;
-    surfaceData.normalWS = GetViewReflectedNormal(surfaceData.normalWS, V, NdotV);
+#ifdef _DOUBLESIDED_ON
+    if (_DoubleSidedConstants.z == 1.0) // when z is one mean DoubleSidedMode none
+    {
+#endif        
+        surfaceData.normalWS = GetViewReflectedNormal(surfaceData.normalWS, V, NdotV);
+#ifdef _DOUBLESIDED_ON
+    }
+    else
+    {
+        NdotV = dot(surfaceData.normalWS, V);
+    }
+#endif
+
+    // This is use with anisotropic material
+    // call GetViewReflectedNormal before Orthonormalize
+    surfaceData.tangentWS = Orthonormalize(surfaceData.tangentWS, surfaceData.normalWS);
 
     // Use bent normal to sample GI if available
 #ifdef _BENTNORMALMAP
@@ -275,9 +291,6 @@ void GetSurfaceAndBuiltinData(FragInputs input, float3 V, inout PositionInputs p
 #else
     surfaceData.specularOcclusion = 1.0;
 #endif
-
-    // This is use with anisotropic material
-    surfaceData.tangentWS = Orthonormalize(surfaceData.tangentWS, surfaceData.normalWS);
 
     // Caution: surfaceData must be fully initialize before calling GetBuiltinData
     GetBuiltinData(input, surfaceData, alpha, bentNormalWS, depthOffset, builtinData);

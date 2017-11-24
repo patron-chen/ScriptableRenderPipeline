@@ -737,6 +737,23 @@ void GetSurfaceAndBuiltinData(FragInputs input, float3 V, inout PositionInputs p
     surfaceData.transmittanceMask = 0.0;
 
     GetNormalWS(input, V, normalTS, surfaceData.normalWS);
+
+    // To reduce artifact related to normal not front-facing (often happening during BRDF evaluation) call GetViewReflectedNormal
+    // Don't do this if we are in DoubleSidedMode none
+    float NdotV;
+#ifdef _DOUBLESIDED_ON
+    if (_DoubleSidedConstants.z == 1.0) // when z is one mean DoubleSidedMode none
+    {
+#endif        
+        surfaceData.normalWS = GetViewReflectedNormal(surfaceData.normalWS, V, NdotV);
+#ifdef _DOUBLESIDED_ON
+    }
+    else
+    {
+        NdotV = dot(surfaceData.normalWS, V);
+    }
+#endif
+
     // Use bent normal to sample GI if available
     // If any layer use a bent normal map, then bentNormalTS contain the interpolated result of bentnormal and normalmap (in case no bent normal are available)
     // Note: the code in LitDataInternal ensure that we fallback on normal map for layer that have no bentnormal
@@ -752,7 +769,7 @@ void GetSurfaceAndBuiltinData(FragInputs input, float3 V, inout PositionInputs p
     // If we have bent normal and ambient occlusion, process a specular occlusion
     surfaceData.specularOcclusion = GetSpecularOcclusionFromBentAO(V, bentNormalWS, surfaceData);
 #elif defined(_MASKMAP0) || defined(_MASKMAP1) || defined(_MASKMAP2) || defined(_MASKMAP3)
-    surfaceData.specularOcclusion = GetSpecularOcclusionFromAmbientOcclusion(dot(surfaceData.normalWS, V), surfaceData.ambientOcclusion, PerceptualSmoothnessToRoughness(surfaceData.perceptualSmoothness));
+    surfaceData.specularOcclusion = GetSpecularOcclusionFromAmbientOcclusion(NdotV, surfaceData.ambientOcclusion, PerceptualSmoothnessToRoughness(surfaceData.perceptualSmoothness));
 #else
     surfaceData.specularOcclusion = 1.0;
 #endif
