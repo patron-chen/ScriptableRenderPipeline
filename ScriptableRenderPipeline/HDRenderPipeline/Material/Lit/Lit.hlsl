@@ -452,7 +452,7 @@ BSDFData ConvertSurfaceDataToBSDFData(SurfaceData surfaceData)
 // conversion function for deferred
 //-----------------------------------------------------------------------------
 
-#define ENCODE_BASECOLOR_WITH_YCOCG
+//#define ENCODE_BASECOLOR_WITH_YCOCG
 
 float3 RGB2YCoCg(float3 c)
 {
@@ -464,10 +464,10 @@ float3 YCoCg2RGB(float3 c)
 	return float3(c.r + c.g - c.b, c.r + c.b, c.r - c.g - c.b);
 }
 
-float edgeFilter(float2 center, float2 a0, float2 a1, float2 a2, float2 a3)
+float edgeFilter(float centerLum, float2 a0, float2 a1, float2 a2, float2 a3)
 {
 	float4 lum = float4(a0.x, a1.x, a2.x, a3.x);
-	float4 w = 1.0f - step(30.0f / 255.0f, abs(lum - center.x));
+	float4 w = 1.0f - step(30.0f / 255.0f, abs(lum - centerLum));
 	float W = w.x + w.y + w.z + w.w;
 	//Handle the special case where all the weights are zero.
 	//In HDR scenes it's better to set the chrominance to zero.
@@ -501,9 +501,10 @@ void EncodeIntoGBuffer( SurfaceData surfaceData,
     ApplyDebugToSurfaceData(surfaceData);
 
     // RT0 - 8:8:8:8 sRGB
-#ifdef ...
+#ifdef ENCODE_BASECOLOR_WITH_YCOCG
     float3 YCoCg = RGB2YCoCg(surfaceData.baseColor);
-    outGBuffer0 = float4((crd.x & 1) == (crd.y & 1) ? YCoCg.rb : YCoCg.rg, 0.0f, surfaceData.specularOcclusion);
+    YCoCg.gb += float2(127.0 / 255.0, 127.0 / 255.0);
+    outGBuffer0 = float4((positionSS.x & 1) == (positionSS.y & 1) ? YCoCg.rb : YCoCg.rg, 0.0f, surfaceData.specularOcclusion);
 #else
     outGBuffer0 = float4(surfaceData.baseColor, surfaceData.specularOcclusion);
 #endif
@@ -629,14 +630,21 @@ void DecodeFromGBuffer(
     inGBuffer3.w = 0.0;
 #endif
 
-#if
-    float2 a0 = tex2D(_MainTex, i.uv + float2(_MainTex_TexelSize.x, 0)).rg;
-	float2 a1 = tex2D(_MainTex, i.uv - float2(_MainTex_TexelSize.x, 0)).rg;
-	float2 a2 = tex2D(_MainTex, i.uv + float2(0, _MainTex_TexelSize.y)).rg;
-	float2 a3 = tex2D(_MainTex, i.uv - float2(0, _MainTex_TexelSize.y)).rg;
-	chroma = edgeFilter(col.rb, a0, a1, a2, a3);
-#endif
+#ifdef ENCODE_BASECOLOR_WITH_YCOCG
+    float2 a0 = LOAD_TEXTURE2D(_GBufferTexture0, positionSS + uint2(1, 0)).rg;
+	float2 a1 = LOAD_TEXTURE2D(_GBufferTexture0, positionSS - uint2(1, 0)).rg;
+	float2 a2 = LOAD_TEXTURE2D(_GBufferTexture0, positionSS + uint2(0, 1)).rg;
+	float2 a3 = LOAD_TEXTURE2D(_GBufferTexture0, positionSS - uint2(0, 1)).rg;
+	float chroma = edgeFilter(inGBuffer0.r, a0, a1, a2, a3);
+    bool pattern = (positionSS.x & 1) == (positionSS.y & 1);
+    float3 baseColor;
+    baseColor = float3(inGBuffer0.rg, chroma);
+    baseColor = pattern ? baseColor.rbg : baseColor.rgb;
+    baseColor.gb -= float2(127.0 / 255.0, 127.0 / 255.0);
+    baseColor = YCoCg2RGB(baseColor);
+#else
     float3 baseColor = inGBuffer0.rgb;
+#endif
     bsdfData.specularOcclusion = inGBuffer0.a;
 
     int octNormalSign;
