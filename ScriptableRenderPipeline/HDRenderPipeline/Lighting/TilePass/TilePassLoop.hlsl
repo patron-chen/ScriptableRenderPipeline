@@ -46,7 +46,7 @@ void ApplyDebug(LightLoopContext lightLoopContext, float3 positionWS, inout floa
 // Calculate the offset in global light index light for current light category
 int GetTileOffset(PositionInputs posInput, uint lightCategory)
 {
-    uint2 tileIndex = posInput.unTileCoord;
+    uint2 tileIndex = posInput.tileCoord;
     return (tileIndex.y + lightCategory * _NumTileFtplY) * _NumTileFtplX + tileIndex.x;
 }
 
@@ -84,15 +84,12 @@ uint FetchIndex(uint tileOffset, uint lightIndex)
 
 uint GetTileSize()
 {
-    if (_UseTileLightList)
-        return TILE_SIZE_FPTL;
-    else
-        return TILE_SIZE_CLUSTERED;
+    return TILE_SIZE_CLUSTERED;
 }
 
 void GetCountAndStartCluster(PositionInputs posInput, uint lightCategory, out uint start, out uint lightCount)
 {
-    uint2 tileIndex = posInput.unTileCoord;
+    uint2 tileIndex = posInput.tileCoord;
 
     float logBase = g_fClustBase;
     if (g_isLogBaseBufferEnabled)
@@ -100,7 +97,7 @@ void GetCountAndStartCluster(PositionInputs posInput, uint lightCategory, out ui
         logBase = g_logBaseBuffer[tileIndex.y * _NumTileClusteredX + tileIndex.x];
     }
 
-    int clustIdx = SnapToClusterIdxFlex(posInput.depthVS, logBase, g_isLogBaseBufferEnabled != 0);
+    int clustIdx = SnapToClusterIdxFlex(posInput.linearDepth, logBase, g_isLogBaseBufferEnabled != 0);
 
     int nrClusters = (1 << g_iLog2NumClusters);
     const int idx = ((lightCategory * nrClusters + clustIdx) * _NumTileClusteredY + tileIndex.y) * _NumTileClusteredX + tileIndex.x;
@@ -111,26 +108,12 @@ void GetCountAndStartCluster(PositionInputs posInput, uint lightCategory, out ui
 
 void GetCountAndStart(PositionInputs posInput, uint lightCategory, out uint start, out uint lightCount)
 {
-    if (_UseTileLightList)
-        GetCountAndStartTile(posInput, lightCategory, start, lightCount);
-    else
-        GetCountAndStartCluster(posInput, lightCategory, start, lightCount);
+    GetCountAndStartCluster(posInput, lightCategory, start, lightCount);
 }
 
 uint FetchIndex(uint tileOffset, uint lightIndex)
 {
-    uint offset = tileOffset + lightIndex;
-    const uint lightIndexPlusOne = lightIndex + 1; // Add +1 as first slot is reserved to store number of light
-
-    if (_UseTileLightList)
-        offset = DWORD_PER_TILE * tileOffset + (lightIndexPlusOne >> 1);
-
-    // Avoid generated HLSL bytecode to always access g_vLightListGlobal with
-    // two different offsets, fixes out of bounds issue
-    uint value = g_vLightListGlobal[offset];
-
-    // Light index are store on 16bit
-    return (_UseTileLightList ? ((value >> ((lightIndexPlusOne & 1) * DWORD_PER_TILE)) & 0xffff) : value);
+    return g_vLightListGlobal[tileOffset + lightIndex];
 }
 
 #endif // USE_FPTL_LIGHTLIST
@@ -143,6 +126,16 @@ uint GetTileSize()
 }
 
 #endif // LIGHTLOOP_TILE_PASS
+
+LightData FetchLight(uint start, uint i)
+{
+#ifdef LIGHTLOOP_TILE_PASS
+    int j = FetchIndex(start, i);
+#else
+    int j = start + i;
+#endif
+    return _LightDatas[j];
+}
 
 // bakeDiffuseLighting is part of the prototype so a user is able to implement a "base pass" with GI and multipass direct light (aka old unity rendering path)
 void LightLoop( float3 V, PositionInputs posInput, PreLightData preLightData, BSDFData bsdfData, BakeLightingData bakeLightingData, uint featureFlags,
@@ -171,80 +164,67 @@ void LightLoop( float3 V, PositionInputs posInput, PreLightData preLightData, BS
 
     if (featureFlags & LIGHTFEATUREFLAGS_PUNCTUAL)
     {
-        #ifdef LIGHTLOOP_TILE_PASS
+        uint lightCount, lightStart;
 
-        // TODO: Convert the for loop below to a while on each type as we know we are sorted and compare performance.
-        uint punctualLightStart;
-        uint punctualLightCount;
-        GetCountAndStart(posInput, LIGHTCATEGORY_PUNCTUAL, punctualLightStart, punctualLightCount);
+    #ifdef LIGHTLOOP_TILE_PASS
+        GetCountAndStart(posInput, LIGHTCATEGORY_PUNCTUAL, lightStart, lightCount);
+    #else
+        lightCount = _PunctualLightCount;
+        lightStart = 0;
+    #endif
 
-        for (i = 0; i < punctualLightCount; ++i)
+        for (i = 0; i < lightCount; i++)
         {
-            int punctualIndex = FetchIndex(punctualLightStart, i);
-            DirectLighting lighting = EvaluateBSDF_Punctual(context, V, posInput, preLightData, _LightDatas[punctualIndex], bsdfData, bakeLightingData, _LightDatas[punctualIndex].lightType);
+            LightData lightData = FetchLight(lightStart, i);
+
+            DirectLighting lighting = EvaluateBSDF_Punctual(context, V, posInput, preLightData, lightData, bsdfData, bakeLightingData);
             AccumulateDirectLighting(lighting, aggregateLighting);
         }
-
-        #else
-
-        for (i = 0; i < _PunctualLightCount; ++i)
-        {
-            DirectLighting lighting = EvaluateBSDF_Punctual(context, V, posInput, preLightData, _LightDatas[i], bsdfData, bakeLightingData, _LightDatas[i].lightType);
-            AccumulateDirectLighting(lighting, aggregateLighting);
-        }
-
-        #endif
     }
 
     if (featureFlags & LIGHTFEATUREFLAGS_AREA)
     {
-        #ifdef LIGHTLOOP_TILE_PASS
+        uint lightCount, lightStart;
 
-        uint areaLightStart;
-        uint areaLightCount;
-        GetCountAndStart(posInput, LIGHTCATEGORY_AREA, areaLightStart, areaLightCount);
+    #ifdef LIGHTLOOP_TILE_PASS
+        GetCountAndStart(posInput, LIGHTCATEGORY_AREA, lightStart, lightCount);
+    #else
+        lightCount = _AreaLightCount;
+        lightStart = _PunctualLightCount;
+    #endif
 
         // COMPILER BEHAVIOR WARNING!
         // If rectangle lights are before line lights, the compiler will duplicate light matrices in VGPR because they are used differently between the two types of lights.
         // By keeping line lights first we avoid this behavior and save substantial register pressure.
         // TODO: This is based on the current Lit.shader and can be different for any other way of implementing area lights, how to be generic and ensure performance ?
 
-        i = 0;
-        if (areaLightCount > 0)
+        if (lightCount > 0)
         {
-            uint areaIndex = FetchIndex(areaLightStart, 0);
-            uint lightType = _LightDatas[areaIndex].lightType;
+            i = 0;
 
-            while (i < areaLightCount && lightType == GPULIGHTTYPE_LINE)
+            uint      last      = lightCount - 1;
+            LightData lightData = FetchLight(lightStart, i);
+
+            while (i <= last && lightData.lightType == GPULIGHTTYPE_LINE)
             {
-                DirectLighting lighting = EvaluateBSDF_Area(context, V, posInput, preLightData, _LightDatas[areaIndex], bsdfData, bakeLightingData, GPULIGHTTYPE_LINE);
+                lightData.lightType = GPULIGHTTYPE_LINE; // Enforce constant propagation
+
+                DirectLighting lighting = EvaluateBSDF_Area(context, V, posInput, preLightData, lightData, bsdfData, bakeLightingData);
                 AccumulateDirectLighting(lighting, aggregateLighting);
 
-                i++;
-                areaIndex = i < areaLightCount ? FetchIndex(areaLightStart, i) : 0;
-                lightType = i < areaLightCount ? _LightDatas[areaIndex].lightType : 0xFF;
+                lightData = FetchLight(lightStart, min(++i, last));
             }
 
-            while (i < areaLightCount && lightType == GPULIGHTTYPE_RECTANGLE)
+            while (i <= last && lightData.lightType == GPULIGHTTYPE_RECTANGLE)
             {
-                DirectLighting lighting = EvaluateBSDF_Area(context, V, posInput, preLightData, _LightDatas[areaIndex], bsdfData, bakeLightingData, GPULIGHTTYPE_RECTANGLE);
+                lightData.lightType = GPULIGHTTYPE_RECTANGLE; // Enforce constant propagation
+
+                DirectLighting lighting = EvaluateBSDF_Area(context, V, posInput, preLightData, lightData, bsdfData, bakeLightingData);
                 AccumulateDirectLighting(lighting, aggregateLighting);
 
-                i++;
-                areaIndex = i < areaLightCount ? FetchIndex(areaLightStart, i) : 0;
-                lightType = i < areaLightCount ? _LightDatas[areaIndex].lightType : 0xFF;
+                lightData = FetchLight(lightStart, min(++i, last));
             }
         }
-
-        #else
-
-        for (i = _PunctualLightCount; i < _PunctualLightCount + _AreaLightCount; ++i)
-        {
-            DirectLighting lighting = EvaluateBSDF_Area(context, V, posInput, preLightData, _LightDatas[i], bsdfData, bakeLightingData, _LightDatas[i].lightType);
-            AccumulateDirectLighting(lighting, aggregateLighting);
-        }
-
-        #endif
     }
 
     float reflectionHierarchyWeight = 0.0; // Max: 1.0

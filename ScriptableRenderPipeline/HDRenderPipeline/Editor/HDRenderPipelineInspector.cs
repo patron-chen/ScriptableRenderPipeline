@@ -7,6 +7,7 @@ namespace UnityEditor.Experimental.Rendering.HDPipeline
     [CustomEditor(typeof(HDRenderPipelineAsset))]
     public sealed partial class HDRenderPipelineInspector : HDBaseEditor<HDRenderPipelineAsset>
     {
+        SerializedProperty m_RenderPipelineResources;
         SerializedProperty m_DefaultDiffuseMaterial;
         SerializedProperty m_DefaultShader;
 
@@ -16,8 +17,7 @@ namespace UnityEditor.Experimental.Rendering.HDPipeline
         SerializedProperty m_enableComputeLightEvaluation;
         SerializedProperty m_enableComputeLightVariants;
         SerializedProperty m_enableComputeMaterialVariants;
-        SerializedProperty m_enableClustered;
-        SerializedProperty m_enableFptlForOpaqueWhenClustered;
+        SerializedProperty m_enableFptlForForwardOpaque;
         SerializedProperty m_enableBigTilePrepass;
 
         // Rendering Settings
@@ -36,9 +36,11 @@ namespace UnityEditor.Experimental.Rendering.HDPipeline
         SerializedProperty m_SpotCookieSize;
         SerializedProperty m_PointCookieSize;
         SerializedProperty m_ReflectionCubemapSize;
+        SerializedProperty m_ReflectionCacheCompressed;
 
         void InitializeProperties()
         {
+            m_RenderPipelineResources = properties.Find("m_RenderPipelineResources");
             m_DefaultDiffuseMaterial = properties.Find("m_DefaultDiffuseMaterial");
             m_DefaultShader = properties.Find("m_DefaultShader");
 
@@ -47,8 +49,7 @@ namespace UnityEditor.Experimental.Rendering.HDPipeline
             m_enableComputeLightEvaluation = properties.Find(x => x.tileSettings.enableComputeLightEvaluation);
             m_enableComputeLightVariants = properties.Find(x => x.tileSettings.enableComputeLightVariants);
             m_enableComputeMaterialVariants = properties.Find(x => x.tileSettings.enableComputeMaterialVariants);
-            m_enableClustered = properties.Find(x => x.tileSettings.enableClustered);
-            m_enableFptlForOpaqueWhenClustered = properties.Find(x => x.tileSettings.enableFptlForOpaqueWhenClustered);
+            m_enableFptlForForwardOpaque = properties.Find(x => x.tileSettings.enableFptlForForwardOpaque);
             m_enableBigTilePrepass = properties.Find(x => x.tileSettings.enableBigTilePrepass);
 
             // Shadow settings
@@ -56,14 +57,15 @@ namespace UnityEditor.Experimental.Rendering.HDPipeline
             m_ShadowAtlasHeight = properties.Find(x => x.shadowInitParams.shadowAtlasHeight);
 
             // Texture settings
-            m_SpotCookieSize = properties.Find(x => x.textureSettings.spotCookieSize);
-            m_PointCookieSize = properties.Find(x => x.textureSettings.pointCookieSize);
-            m_ReflectionCubemapSize = properties.Find(x => x.textureSettings.reflectionCubemapSize);
+            m_SpotCookieSize = properties.Find(x => x.globalTextureSettings.spotCookieSize);
+            m_PointCookieSize = properties.Find(x => x.globalTextureSettings.pointCookieSize);
+            m_ReflectionCubemapSize = properties.Find(x => x.globalTextureSettings.reflectionCubemapSize);
+            m_ReflectionCacheCompressed = properties.Find(x => x.globalTextureSettings.reflectionCacheCompressed);
 
             // Rendering settings
-            m_RenderingUseForwardOnly = properties.Find(x => x.renderingSettings.useForwardRenderingOnly);
-            m_RenderingUseDepthPrepass = properties.Find(x => x.renderingSettings.useDepthPrepassWithDeferredRendering);
-            m_RenderingUseDepthPrepassAlphaTestOnly = properties.Find(x => x.renderingSettings.renderAlphaTestOnlyInDeferredPrepass);
+            m_RenderingUseForwardOnly = properties.Find(x => x.globalRenderingSettings.useForwardRenderingOnly);
+            m_RenderingUseDepthPrepass = properties.Find(x => x.globalRenderingSettings.useDepthPrepassWithDeferredRendering);
+            m_RenderingUseDepthPrepassAlphaTestOnly = properties.Find(x => x.globalRenderingSettings.renderAlphaTestOnlyInDeferredPrepass);
 
             // Subsurface Scattering Settings
             m_SubsurfaceScatteringSettings = properties.Find(x => x.sssSettings);
@@ -90,22 +92,14 @@ namespace UnityEditor.Experimental.Rendering.HDPipeline
             {
                 EditorGUI.indentLevel++;
                 EditorGUILayout.PropertyField(m_enableBigTilePrepass, s_Styles.enableBigTilePrepass);
-                EditorGUILayout.PropertyField(m_enableClustered, s_Styles.enableClustered);
 
-                // Tag: SUPPORT_COMPUTE_CLUSTER_OPAQUE - Uncomment this if you want to do cluster opaque with compute shader (by default we support only fptl on opaque)
-                // if (m_enableClustered.boolValue)
-                if (m_enableClustered.boolValue && !m_enableComputeLightEvaluation.boolValue)
-                {
-                    EditorGUI.indentLevel++;
-                    EditorGUILayout.PropertyField(m_enableFptlForOpaqueWhenClustered, s_Styles.enableFptlForOpaqueWhenClustered);
-                    EditorGUI.indentLevel--;
-                }
+                // Allow to disable cluster for foward opaque when in forward only (option have no effect when MSAA is enabled)
+                // Deferred opaque are always tiled
+                EditorGUILayout.PropertyField(m_enableFptlForForwardOpaque, s_Styles.enableFptlForForwardOpaque);
+
                 EditorGUILayout.PropertyField(m_enableComputeLightEvaluation, s_Styles.enableComputeLightEvaluation);
                 if (m_enableComputeLightEvaluation.boolValue)
                 {
-                    // Tag: SUPPORT_COMPUTE_CLUSTER_OPAQUE - Uncomment this if you want to do cluster opaque with compute shader (by default we support only fptl on opaque)
-                    m_enableFptlForOpaqueWhenClustered.boolValue = true; // Force fptl to be always true if compute evaluation is enable
-
                     EditorGUI.indentLevel++;
                     EditorGUILayout.PropertyField(m_enableComputeLightVariants, s_Styles.enableComputeLightVariants);
                     EditorGUILayout.PropertyField(m_enableComputeMaterialVariants, s_Styles.enableComputeMaterialVariants);
@@ -189,6 +183,9 @@ namespace UnityEditor.Experimental.Rendering.HDPipeline
             EditorGUILayout.PropertyField(m_SpotCookieSize, s_Styles.spotCookieSize);
             EditorGUILayout.PropertyField(m_PointCookieSize, s_Styles.pointCookieSize);
             EditorGUILayout.PropertyField(m_ReflectionCubemapSize, s_Styles.reflectionCubemapSize);
+            
+            // Commented ou until we have proper realtime BC6H compression
+            //EditorGUILayout.PropertyField(m_ReflectionCacheCompressed, s_Styles.reflectionCacheCompressed);
 
             if (EditorGUI.EndChangeCheck())
             {
@@ -215,6 +212,7 @@ namespace UnityEditor.Experimental.Rendering.HDPipeline
 
             EditorGUILayout.LabelField(s_Styles.defaults, EditorStyles.boldLabel);
             EditorGUI.indentLevel++;
+            EditorGUILayout.PropertyField(m_RenderPipelineResources, s_Styles.renderPipelineResources);            
             EditorGUILayout.PropertyField(m_DefaultDiffuseMaterial, s_Styles.defaultDiffuseMaterial);
             EditorGUILayout.PropertyField(m_DefaultShader, s_Styles.defaultShader);
             EditorGUI.indentLevel--;

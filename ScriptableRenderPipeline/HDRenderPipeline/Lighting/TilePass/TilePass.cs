@@ -1,4 +1,4 @@
-using UnityEngine.Rendering;
+﻿using UnityEngine.Rendering;
 using System.Collections.Generic;
 using System;
 
@@ -87,14 +87,14 @@ namespace UnityEngine.Experimental.Rendering.HDPipeline
                     RenderTargetIdentifier[] tex;
                     sc.GetTex2DArrays(out tex, out offset, out count);
 
-                    // bind buffers
-                    cb.SetGlobalBuffer(HDShaderIDs._ShadowDatasExp, s_ShadowDataBuffer);
-                    cb.SetGlobalBuffer(HDShaderIDs._ShadowPayloads, s_ShadowPayloadBuffer);
-                    // bind textures
-                    cb.SetGlobalTexture(HDShaderIDs._ShadowmapExp_VSM_0, tex[0]);
-                    cb.SetGlobalTexture(HDShaderIDs._ShadowmapExp_VSM_1, tex[1]);
-                    cb.SetGlobalTexture(HDShaderIDs._ShadowmapExp_VSM_2, tex[2]);
-                    cb.SetGlobalTexture(HDShaderIDs._ShadowmapExp_PCF, tex[3]);
+                        // bind buffers
+                        cb.SetGlobalBuffer(HDShaderIDs._ShadowDatasExp, s_ShadowDataBuffer);
+                        cb.SetGlobalBuffer(HDShaderIDs._ShadowPayloads, s_ShadowPayloadBuffer);
+                        // bind textures
+                        cb.SetGlobalTexture(HDShaderIDs._ShadowmapExp_VSM_0, tex[0]);
+                        cb.SetGlobalTexture(HDShaderIDs._ShadowmapExp_VSM_1, tex[1]);
+                        cb.SetGlobalTexture(HDShaderIDs._ShadowmapExp_VSM_2, tex[2]);
+                        cb.SetGlobalTexture(HDShaderIDs._ShadowmapExp_PCF, tex[3]);
 
                     // TODO: Currently samplers are hard coded in ShadowContext.hlsl, so we can't really set them here
                 };
@@ -110,7 +110,7 @@ namespace UnityEngine.Experimental.Rendering.HDPipeline
             scInit.resourceBinder                    = binder;
 
             m_ShadowMgr = new ShadowManager(shadowSettings, ref scInit, m_Shadowmaps);
-            // set global overrides - these need to match the override specified in ShadowDispatch.hlsl
+            // set global overrides - these need to match the override specified in TilePass/Shadow.hlsl
             bool useGlobalOverrides = true;
             m_ShadowMgr.SetGlobalShadowOverride( GPUShadowType.Point        , ShadowAlgorithm.PCF, ShadowVariant.V4, ShadowPrecision.High, useGlobalOverrides );
             m_ShadowMgr.SetGlobalShadowOverride( GPUShadowType.Spot         , ShadowAlgorithm.PCF, ShadowVariant.V4, ShadowPrecision.High, useGlobalOverrides );
@@ -241,22 +241,31 @@ namespace UnityEngine.Experimental.Rendering.HDPipeline
             public bool enableComputeLightEvaluation;
             public bool enableComputeLightVariants;
             public bool enableComputeMaterialVariants;
+            // Deferred opaque always use FPTL, forward opaque can use FPTL or cluster, transparent always use cluster
+            // When MSAA is enabled, we only support cluster (Fptl is too slow with MSAA), and we don't support MSAA for deferred path (mean it is ok to keep fptl)
+            public bool enableFptlForForwardOpaque;
 
             // clustered light list specific buffers and data begin
-            public bool enableClustered;
-            public bool enableFptlForOpaqueWhenClustered; // still useful on opaques. Should be true by default to force tile on opaque.
             public bool enableBigTilePrepass;
 
-            [Range(0.0f, 1.0f)]
-            public float diffuseGlobalDimmer = 1.0f;
-            [Range(0.0f, 1.0f)]
-            public float specularGlobalDimmer = 1.0f;
-
-            public enum TileDebug : int
+            public enum TileClusterDebug : int
             {
-                None = 0, Punctual = 1, Area = 2, AreaAndPunctual = 3, Environment = 4, EnvironmentAndPunctual = 5, EnvironmentAndArea = 6, EnvironmentAndAreaAndPunctual = 7,
-                FeatureVariants = 8
-            }; //TODO: we should probably make this checkboxes
+                None,
+                Tile,
+                Cluster,
+                FeatureVariants
+            };
+
+            public enum TileClusterCategoryDebug : int
+            {
+                Punctual = 1,
+                Area = 2,
+                AreaAndPunctual = 3,
+                Environment = 4,
+                EnvironmentAndPunctual = 5,
+                EnvironmentAndArea = 6,
+                EnvironmentAndAreaAndPunctual = 7
+            };
 
             public TileSettings()
             {
@@ -265,12 +274,8 @@ namespace UnityEngine.Experimental.Rendering.HDPipeline
                 enableComputeLightVariants = true;
                 enableComputeMaterialVariants = true;
 
-                enableClustered = true;
-                enableFptlForOpaqueWhenClustered = true;
+                enableFptlForForwardOpaque = true;
                 enableBigTilePrepass = true;
-
-                diffuseGlobalDimmer = 1.0f;
-                specularGlobalDimmer = 1.0f;
             }
         }
 
@@ -291,13 +296,16 @@ namespace UnityEngine.Experimental.Rendering.HDPipeline
             static ComputeBuffer s_shadowDatas = null;
 
             static Texture2DArray m_DefaultTexture2DArray;
+            static Cubemap m_DefaultTextureCube;
 
-            TextureCacheCubemap m_CubeReflTexArray;
-            int m_CubeReflTexArraySize = 128;
+            ReflectionProbeCache m_ReflectionProbeCache;
+            int m_ReflectionProbeCacheSize = 128;
             TextureCache2D m_CookieTexArray;
             int m_CookieTexArraySize = 16;
             TextureCacheCubemap m_CubeCookieTexArray;
             int m_CubeCookieTexArraySize = 16;
+
+            LightingSettings m_LightingSettings = new LightingSettings();
 
             public class LightList
             {
@@ -362,18 +370,11 @@ namespace UnityEngine.Experimental.Rendering.HDPipeline
             static int s_BuildMaterialFlagsWriteKernel;
             static int s_BuildMaterialFlagsOrKernel;
 
-            static int s_shadeOpaqueDirectClusteredKernel;
             static int s_shadeOpaqueDirectFptlKernel;
-            static int s_shadeOpaqueDirectClusteredDebugDisplayKernel;
             static int s_shadeOpaqueDirectFptlDebugDisplayKernel;
-
-            static int s_shadeOpaqueDirectShadowMaskClusteredKernel;
             static int s_shadeOpaqueDirectShadowMaskFptlKernel;
-            static int s_shadeOpaqueDirectShadowMaskClusteredDebugDisplayKernel;
             static int s_shadeOpaqueDirectShadowMaskFptlDebugDisplayKernel;
 
-            // Tag: SUPPORT_COMPUTE_CLUSTER_OPAQUE - Uncomment this if you want to do cluster opaque with compute shader (by default we support only fptl on opaque)
-            //static int[] s_shadeOpaqueIndirectClusteredKernels = new int[LightDefinitions.s_NumFeatureVariants];
             static int[] s_shadeOpaqueIndirectFptlKernels = new int[LightDefinitions.s_NumFeatureVariants];
             static int[] s_shadeOpaqueIndirectShadowMaskFptlKernels = new int[LightDefinitions.s_NumFeatureVariants];
 
@@ -402,19 +403,11 @@ namespace UnityEngine.Experimental.Rendering.HDPipeline
             static ComputeBuffer s_GlobalLightListAtomic = null;
             // clustered light list specific buffers and data end
 
-            bool usingFptl
-            {
-                get
-                {
-                    bool isEnabledMSAA = false;
-                    Debug.Assert(!isEnabledMSAA || m_TileSettings.enableClustered);
-                    bool disableFptl = (!m_TileSettings.enableFptlForOpaqueWhenClustered && m_TileSettings.enableClustered) || isEnabledMSAA;
-                    return !disableFptl;
-                }
-            }
+            bool m_isFptlEnabled;
+            bool m_isFptlEnabledForForwardOpaque;
 
             // Following is an array of material of size eight for all combination of keyword: OUTPUT_SPLIT_LIGHTING - LIGHTLOOP_TILE_PASS - SHADOWS_SHADOWMASK - USE_FPTL_LIGHTLIST/USE_CLUSTERED_LIGHTLIST - DEBUG_DISPLAY
-            Material[, , , ,] m_lightingMaterial;
+            Material[] m_deferredLightingMaterial;
             Material m_DebugViewTilesMaterial;
 
             Light m_CurrentSunLight;
@@ -465,9 +458,9 @@ namespace UnityEngine.Experimental.Rendering.HDPipeline
                 return (camera.pixelHeight + (LightDefinitions.s_TileSizeClustered - 1)) / LightDefinitions.s_TileSizeClustered;
             }
 
-            public static bool GetFeatureVariantsEnabled(TileSettings tileSettings)
+            public bool GetFeatureVariantsEnabled()
             {
-                return tileSettings.enableComputeLightEvaluation && (tileSettings.enableComputeLightVariants || tileSettings.enableComputeMaterialVariants) && !(tileSettings.enableClustered && !tileSettings.enableFptlForOpaqueWhenClustered);
+                return m_isFptlEnabled && m_TileSettings.enableComputeLightEvaluation && (m_TileSettings.enableComputeLightVariants || m_TileSettings.enableComputeMaterialVariants);
             }
 
             TileSettings m_TileSettings = null;
@@ -476,8 +469,25 @@ namespace UnityEngine.Experimental.Rendering.HDPipeline
             public LightLoop()
             {}
 
-            public void Build(RenderPipelineResources renderPipelineResources, TileSettings tileSettings, TextureSettings textureSettings, ShadowInitParameters shadowInit, ShadowSettings shadowSettings)
+            int GetDeferredLightingMaterialIndex(int outputSplitLighting, int lightLoopTilePass, int shadowMask, int debugDisplay)
             {
+                return (outputSplitLighting) | (lightLoopTilePass << 1) | (shadowMask << 2) | (debugDisplay << 3);
+            }
+
+            public void Build(  RenderPipelineResources renderPipelineResources,
+                                GlobalRenderingSettings renderingSettings,
+                                TileSettings tileSettings,
+                                GlobalTextureSettings textureSettings,
+                                ShadowInitParameters shadowInit, ShadowSettings shadowSettings, IBLFilterGGX iblFilterGGX)
+            {
+                // Deferred opaque are always using Fptl. Forward opaque can use Fptl or Cluster, transparent use cluster.
+                // When MSAA is enabled we disable Fptl as it become expensive compare to cluster
+                // In HD, MSAA is only supported for forward only rendering, no MSAA in deferred mode (for code complexity reasons)
+
+                // If Deferred, enable Fptl. If we are forward renderer only and not using Fptl for forward opaque, disable Fptl
+                m_isFptlEnabled = !renderingSettings.ShouldUseForwardRenderingOnly() || tileSettings.enableFptlForForwardOpaque; // TODO: Disable if MSAA
+                m_isFptlEnabledForForwardOpaque = tileSettings.enableFptlForForwardOpaque; // TODO: Disable if MSAA
+
                 m_Resources = renderPipelineResources;
                 m_TileSettings = tileSettings;
 
@@ -493,13 +503,13 @@ namespace UnityEngine.Experimental.Rendering.HDPipeline
                 m_CookieTexArray.AllocTextureArray(m_CookieTexArraySize, textureSettings.spotCookieSize, textureSettings.spotCookieSize, TextureFormat.RGBA32, true);
                 m_CubeCookieTexArray = new TextureCacheCubemap();
                 m_CubeCookieTexArray.AllocTextureArray(m_CubeCookieTexArraySize, textureSettings.pointCookieSize, TextureFormat.RGBA32, true);
-                m_CubeReflTexArray = new TextureCacheCubemap();
-                m_CubeReflTexArray.AllocTextureArray(m_CubeReflTexArraySize, textureSettings.reflectionCubemapSize, TextureCache.GetPreferredHdrCompressedTextureFormat, true);
+
+                TextureFormat probeCacheFormat = textureSettings.reflectionCacheCompressed ? TextureFormat.BC6H : TextureFormat.RGBAHalf;
+                m_ReflectionProbeCache = new ReflectionProbeCache(iblFilterGGX, m_ReflectionProbeCacheSize, textureSettings.reflectionCubemapSize, probeCacheFormat, true);
 
                 s_GenAABBKernel = buildScreenAABBShader.FindKernel("ScreenBoundsAABB");
 
-                bool enableFeatureVariants = GetFeatureVariantsEnabled(m_TileSettings);
-                if (enableFeatureVariants)
+                if (GetFeatureVariantsEnabled())
                 {
                     s_GenListPerTileKernel = buildPerTileLightListShader.FindKernel(m_TileSettings.enableBigTilePrepass ? "TileLightListGen_SrcBigTile_FeatureFlags" : "TileLightListGen_FeatureFlags");
                 }
@@ -512,7 +522,7 @@ namespace UnityEngine.Experimental.Rendering.HDPipeline
                 s_LightVolumeDataBuffer = new ComputeBuffer(k_MaxLightsOnScreen, System.Runtime.InteropServices.Marshal.SizeOf(typeof(LightVolumeData)));
                 s_DispatchIndirectBuffer = new ComputeBuffer(LightDefinitions.s_NumFeatureVariants * 3, sizeof(uint), ComputeBufferType.IndirectArguments);
 
-                if (m_TileSettings.enableClustered)
+                // Cluster
                 {
                     var kernelName = m_TileSettings.enableBigTilePrepass ? (k_UseDepthBuffer ? "TileLightListGen_DepthRT_SrcBigTile" : "TileLightListGen_NoDepthRT_SrcBigTile") : (k_UseDepthBuffer ? "TileLightListGen_DepthRT" : "TileLightListGen_NoDepthRT");
                     s_GenListPerVoxelKernel = buildPerVoxelLightListShader.FindKernel(kernelName);
@@ -531,22 +541,16 @@ namespace UnityEngine.Experimental.Rendering.HDPipeline
                 s_BuildMaterialFlagsOrKernel = buildMaterialFlagsShader.FindKernel("MaterialFlagsGen_Or");
                 s_BuildMaterialFlagsWriteKernel = buildMaterialFlagsShader.FindKernel("MaterialFlagsGen_Write");
 
-                s_shadeOpaqueDirectClusteredKernel = deferredComputeShader.FindKernel("Deferred_Direct_Clustered");
                 s_shadeOpaqueDirectFptlKernel = deferredComputeShader.FindKernel("Deferred_Direct_Fptl");
-                s_shadeOpaqueDirectClusteredDebugDisplayKernel = deferredComputeShader.FindKernel("Deferred_Direct_Clustered_DebugDisplay");
                 s_shadeOpaqueDirectFptlDebugDisplayKernel = deferredComputeShader.FindKernel("Deferred_Direct_Fptl_DebugDisplay");
 
-                s_shadeOpaqueDirectShadowMaskClusteredKernel = deferredComputeShader.FindKernel("Deferred_Direct_ShadowMask_Clustered");
                 s_shadeOpaqueDirectShadowMaskFptlKernel = deferredComputeShader.FindKernel("Deferred_Direct_ShadowMask_Fptl");
-                s_shadeOpaqueDirectShadowMaskClusteredDebugDisplayKernel = deferredComputeShader.FindKernel("Deferred_Direct_ShadowMask_Clustered_DebugDisplay");
                 s_shadeOpaqueDirectShadowMaskFptlDebugDisplayKernel = deferredComputeShader.FindKernel("Deferred_Direct_ShadowMask_Fptl_DebugDisplay");
 
                 s_deferredDirectionalShadowKernel = deferredDirectionalShadowComputeShader.FindKernel("DeferredDirectionalShadow");
 
                 for (int variant = 0; variant < LightDefinitions.s_NumFeatureVariants; variant++)
                 {
-                    // Tag: SUPPORT_CLUSTER_OPAQUE - Uncomment this if you want to do cluster opaque (by default we support only fptl on opaque)
-                    // s_shadeOpaqueIndirectClusteredKernels[variant] = deferredComputeShader.FindKernel("Deferred_Indirect_Clustered_Variant" + variant);
                     s_shadeOpaqueIndirectFptlKernels[variant] = deferredComputeShader.FindKernel("Deferred_Indirect_Fptl_Variant" + variant);
                     s_shadeOpaqueIndirectShadowMaskFptlKernels[variant] = deferredComputeShader.FindKernel("Deferred_Indirect_ShadowMask_Fptl_Variant" + variant);
                 }
@@ -555,31 +559,29 @@ namespace UnityEngine.Experimental.Rendering.HDPipeline
                 s_TileList = null;
                 s_TileFeatureFlags = null;
 
-                // OUTPUT_SPLIT_LIGHTING - LIGHTLOOP_TILE_PASS - SHADOWS_SHADOWMASK - USE_FPTL_LIGHTLIST/USE_CLUSTERED_LIGHTLIST - DEBUG_DISPLAY
-                m_lightingMaterial = new Material[2, 2, 2, 2, 2];
+                // OUTPUT_SPLIT_LIGHTING - LIGHTLOOP_TILE_PASS - SHADOWS_SHADOWMASK - DEBUG_DISPLAY
+                m_deferredLightingMaterial = new Material[16];
 
                 for (int outputSplitLighting = 0; outputSplitLighting < 2; ++outputSplitLighting)
                 {
                     for (int lightLoopTilePass = 0; lightLoopTilePass < 2; ++lightLoopTilePass)
                     {
-                        for (int ShadowMask = 0; ShadowMask < 2; ++ShadowMask)
+                        for (int shadowMask = 0; shadowMask < 2; ++shadowMask)
                         {
-                            for (int clustered = 0; clustered < 2; ++clustered)
-                            {
                                 for (int debugDisplay = 0; debugDisplay < 2; ++debugDisplay)
                                 {
-                                    m_lightingMaterial[outputSplitLighting, lightLoopTilePass, ShadowMask, clustered, debugDisplay] = CoreUtils.CreateEngineMaterial(m_Resources.deferredShader);
-                                    CoreUtils.SetKeyword(m_lightingMaterial[outputSplitLighting, lightLoopTilePass, ShadowMask, clustered, debugDisplay], "OUTPUT_SPLIT_LIGHTING", outputSplitLighting == 1);
-                                    CoreUtils.SelectKeyword(m_lightingMaterial[outputSplitLighting, lightLoopTilePass, ShadowMask, clustered, debugDisplay], "LIGHTLOOP_TILE_PASS", "LIGHTLOOP_SINGLE_PASS", lightLoopTilePass == 1);
-                                    CoreUtils.SetKeyword(m_lightingMaterial[outputSplitLighting, lightLoopTilePass, ShadowMask, clustered, debugDisplay], "SHADOWS_SHADOWMASK", ShadowMask == 1);
-                                    CoreUtils.SelectKeyword(m_lightingMaterial[outputSplitLighting, lightLoopTilePass, ShadowMask, clustered, debugDisplay], "USE_CLUSTERED_LIGHTLIST", "USE_FPTL_LIGHTLIST", clustered == 1);
-                                    CoreUtils.SetKeyword(m_lightingMaterial[outputSplitLighting, lightLoopTilePass, ShadowMask, clustered, debugDisplay], "DEBUG_DISPLAY", debugDisplay == 1);
+                                int index = GetDeferredLightingMaterialIndex(outputSplitLighting, lightLoopTilePass, shadowMask, debugDisplay);
 
-                                    m_lightingMaterial[outputSplitLighting, lightLoopTilePass, ShadowMask, clustered, debugDisplay].SetInt(HDShaderIDs._StencilRef, outputSplitLighting == 1 ? (int)StencilLightingUsage.SplitLighting : (int)StencilLightingUsage.RegularLighting);
-                                    m_lightingMaterial[outputSplitLighting, lightLoopTilePass, ShadowMask, clustered, debugDisplay].SetInt(HDShaderIDs._StencilCmp, (int)CompareFunction.Equal);
-                                    m_lightingMaterial[outputSplitLighting, lightLoopTilePass, ShadowMask, clustered, debugDisplay].SetInt(HDShaderIDs._SrcBlend, (int)BlendMode.One);
-                                    m_lightingMaterial[outputSplitLighting, lightLoopTilePass, ShadowMask, clustered, debugDisplay].SetInt(HDShaderIDs._DstBlend, (int)BlendMode.Zero);
-                                }
+                                m_deferredLightingMaterial[index] = CoreUtils.CreateEngineMaterial(m_Resources.deferredShader);
+                                CoreUtils.SetKeyword(m_deferredLightingMaterial[index], "OUTPUT_SPLIT_LIGHTING", outputSplitLighting == 1);
+                                CoreUtils.SelectKeyword(m_deferredLightingMaterial[index], "LIGHTLOOP_TILE_PASS", "LIGHTLOOP_SINGLE_PASS", lightLoopTilePass == 1);
+                                CoreUtils.SetKeyword(m_deferredLightingMaterial[index], "SHADOWS_SHADOWMASK", shadowMask == 1);
+                                CoreUtils.SetKeyword(m_deferredLightingMaterial[index], "DEBUG_DISPLAY", debugDisplay == 1);
+
+                                m_deferredLightingMaterial[index].SetInt(HDShaderIDs._StencilRef, outputSplitLighting == 1 ? (int)StencilLightingUsage.SplitLighting : (int)StencilLightingUsage.RegularLighting);
+                                m_deferredLightingMaterial[index].SetInt(HDShaderIDs._StencilCmp, (int)CompareFunction.Equal);
+                                m_deferredLightingMaterial[index].SetInt(HDShaderIDs._SrcBlend, (int)BlendMode.One);
+                                m_deferredLightingMaterial[index].SetInt(HDShaderIDs._DstBlend, (int)BlendMode.Zero);
                             }
                         }
                     }
@@ -590,6 +592,9 @@ namespace UnityEngine.Experimental.Rendering.HDPipeline
                 m_DefaultTexture2DArray = new Texture2DArray(1, 1, 1, TextureFormat.ARGB32, false);
                 m_DefaultTexture2DArray.SetPixels32(new Color32[1] { new Color32(128, 128, 128, 128) }, 0);
                 m_DefaultTexture2DArray.Apply();
+
+                m_DefaultTextureCube = new Cubemap(16, TextureFormat.ARGB32, false);
+                m_DefaultTextureCube.Apply();
 
 #if UNITY_EDITOR
                 UnityEditor.SceneView.onSceneGUIDelegate -= OnSceneGUI;
@@ -612,10 +617,10 @@ namespace UnityEngine.Experimental.Rendering.HDPipeline
                 CoreUtils.SafeRelease(s_EnvLightDatas);
                 CoreUtils.SafeRelease(s_shadowDatas);
 
-                if (m_CubeReflTexArray != null)
+                if (m_ReflectionProbeCache != null)
                 {
-                    m_CubeReflTexArray.Release();
-                    m_CubeReflTexArray = null;
+                    m_ReflectionProbeCache.Release();
+                    m_ReflectionProbeCache = null;
                 }
                 if (m_CookieTexArray != null)
                 {
@@ -642,18 +647,16 @@ namespace UnityEngine.Experimental.Rendering.HDPipeline
                 {
                     for (int lightLoopTilePass = 0; lightLoopTilePass < 2; ++lightLoopTilePass)
                     {
-                        for (int ShadowMask = 0; ShadowMask < 2; ++ShadowMask)
+                        for (int shadowMask = 0; shadowMask < 2; ++shadowMask)
                         {
-                            for (int clustered = 0; clustered < 2; ++clustered)
-                            {
                                 for (int debugDisplay = 0; debugDisplay < 2; ++debugDisplay)
                                 {
-                                    CoreUtils.Destroy(m_lightingMaterial[outputSplitLighting, lightLoopTilePass, ShadowMask, clustered, debugDisplay]);
+                                int index = GetDeferredLightingMaterialIndex(outputSplitLighting, lightLoopTilePass, shadowMask, debugDisplay);
+                                CoreUtils.Destroy(m_deferredLightingMaterial[index]);
                                 }
                             }
                         }
                     }
-                }
 
                 CoreUtils.Destroy(m_DebugViewTilesMaterial);
             }
@@ -662,14 +665,14 @@ namespace UnityEngine.Experimental.Rendering.HDPipeline
             {
                 m_CookieTexArray.NewFrame();
                 m_CubeCookieTexArray.NewFrame();
-                m_CubeReflTexArray.NewFrame();
+                m_ReflectionProbeCache.NewFrame();
             }
 
             public bool NeedResize()
             {
                 return s_LightList == null || s_TileList == null || s_TileFeatureFlags == null ||
                     (s_BigTileLightList == null && m_TileSettings.enableBigTilePrepass) ||
-                    (s_PerVoxelLightLists == null && m_TileSettings.enableClustered);
+                    (s_PerVoxelLightLists == null);
             }
 
             public void ReleaseResolutionDependentBuffers()
@@ -704,7 +707,7 @@ namespace UnityEngine.Experimental.Rendering.HDPipeline
                 s_TileList = new ComputeBuffer((int)LightDefinitions.s_NumFeatureVariants * nrTiles, sizeof(uint));
                 s_TileFeatureFlags = new ComputeBuffer(nrTilesX * nrTilesY, sizeof(uint));
 
-                if (m_TileSettings.enableClustered)
+                // Cluster
                 {
                     var nrClustersX = (width + LightDefinitions.s_TileSizeClustered - 1) / LightDefinitions.s_TileSizeClustered;
                     var nrClustersY = (height + LightDefinitions.s_TileSizeClustered - 1) / LightDefinitions.s_TileSizeClustered;
@@ -751,12 +754,12 @@ namespace UnityEngine.Experimental.Rendering.HDPipeline
                 return new Vector3(light.finalColor.r, light.finalColor.g, light.finalColor.b);
             }
 
-            public bool GetDirectionalLightData(ShadowSettings shadowSettings, GPULightType gpuLightType, VisibleLight light, HDAdditionalLightData additionalData, AdditionalShadowData additionalShadowData, int lightIndex)
+            public bool GetDirectionalLightData(CommandBuffer cmd, ShadowSettings shadowSettings, GPULightType gpuLightType, VisibleLight light, HDAdditionalLightData additionalData, AdditionalShadowData additionalShadowData, int lightIndex)
             {
                 var directionalLightData = new DirectionalLightData();
 
-                float diffuseDimmer = m_TileSettings.diffuseGlobalDimmer * additionalData.lightDimmer;
-                float specularDimmer = m_TileSettings.specularGlobalDimmer * additionalData.lightDimmer;
+                float diffuseDimmer = m_LightingSettings.diffuseGlobalDimmer * additionalData.lightDimmer;
+                float specularDimmer = m_LightingSettings.specularGlobalDimmer * additionalData.lightDimmer;
                 if (diffuseDimmer  <= 0.0f && specularDimmer <= 0.0f)
                     return false;
 
@@ -774,7 +777,7 @@ namespace UnityEngine.Experimental.Rendering.HDPipeline
                 if (light.light.cookie != null)
                 {
                     directionalLightData.tileCookie = light.light.cookie.wrapMode == TextureWrapMode.Repeat;
-                    directionalLightData.cookieIndex = m_CookieTexArray.FetchSlice(light.light.cookie);
+                    directionalLightData.cookieIndex = m_CookieTexArray.FetchSlice(cmd, light.light.cookie);
                 }
                 // fix up shadow information
                 int shadowIdx;
@@ -829,7 +832,7 @@ namespace UnityEngine.Experimental.Rendering.HDPipeline
                 return 1.0f - Mathf.Clamp01(distanceToCamera * scale + bias);
             }
 
-            public bool GetLightData(ShadowSettings shadowSettings, Camera camera, GPULightType gpuLightType, VisibleLight light, HDAdditionalLightData additionalLightData, AdditionalShadowData additionalshadowData, int lightIndex)
+            public bool GetLightData(CommandBuffer cmd, ShadowSettings shadowSettings, Camera camera, GPULightType gpuLightType, VisibleLight light, HDAdditionalLightData additionalLightData, AdditionalShadowData additionalshadowData, int lightIndex)
             {
                 var lightData = new LightData();
 
@@ -906,8 +909,8 @@ namespace UnityEngine.Experimental.Rendering.HDPipeline
                 float distanceFade = ComputeLinearDistanceFade(distanceToCamera, additionalLightData.fadeDistance);
                 float lightScale = additionalLightData.lightDimmer * distanceFade;
 
-                lightData.diffuseScale = additionalLightData.affectDiffuse ? lightScale * m_TileSettings.diffuseGlobalDimmer : 0.0f;
-                lightData.specularScale = additionalLightData.affectSpecular ? lightScale * m_TileSettings.specularGlobalDimmer : 0.0f;
+                lightData.diffuseScale = additionalLightData.affectDiffuse ? lightScale * m_LightingSettings.diffuseGlobalDimmer : 0.0f;
+                lightData.specularScale = additionalLightData.affectSpecular ? lightScale * m_LightingSettings.specularGlobalDimmer : 0.0f;
 
                 if (lightData.diffuseScale <= 0.0f && lightData.specularScale <= 0.0f)
                     return false;
@@ -921,17 +924,17 @@ namespace UnityEngine.Experimental.Rendering.HDPipeline
                     switch (light.lightType)
                     {
                         case LightType.Spot:
-                            lightData.cookieIndex = m_CookieTexArray.FetchSlice(light.light.cookie);
+                            lightData.cookieIndex = m_CookieTexArray.FetchSlice(cmd, light.light.cookie);
                             break;
                         case LightType.Point:
-                            lightData.cookieIndex = m_CubeCookieTexArray.FetchSlice(light.light.cookie);
+                            lightData.cookieIndex = m_CubeCookieTexArray.FetchSlice(cmd, light.light.cookie);
                             break;
                     }
                 }
                 else if (light.lightType == LightType.Spot && additionalLightData.spotLightShape != SpotLightShape.Cone)
                 {
                     // Projectors lights must always have a cookie texture.
-                    lightData.cookieIndex = m_CookieTexArray.FetchSlice(Texture2D.whiteTexture);
+                    lightData.cookieIndex = m_CookieTexArray.FetchSlice(cmd, Texture2D.whiteTexture);
                 }
 
                 if (additionalshadowData)
@@ -1147,8 +1150,19 @@ namespace UnityEngine.Experimental.Rendering.HDPipeline
                 m_lightList.lightVolumes.Add(lightVolumeData);
             }
 
-            public void GetEnvLightData(VisibleReflectionProbe probe)
+            public bool GetEnvLightData(CommandBuffer cmd, Camera camera, VisibleReflectionProbe probe)
             {
+                // For now we won't display real time probe when rendering one.
+                // TODO: We may want to display last frame result but in this case we need to be careful not to update the atlas before all realtime probes are rendered (for frame coherency).
+                // Unfortunately we don't have this information at the moment.
+                if (probe.probe.mode == ReflectionProbeMode.Realtime && camera.cameraType == CameraType.Reflection)
+                    return false;
+
+                int envIndex = m_ReflectionProbeCache.FetchSlice(cmd, probe.texture);
+                // -1 means that the texture is not ready yet (ie not convolved/compressed yet)
+                if (envIndex == -1)
+                    return false;
+
                 var envLightData = new EnvLightData();
 
                 // CAUTION: localToWorld is the transform for the widget of the reflection probe. i.e the world position of the point use to do the cubemap capture (mean it include the local offset)
@@ -1183,13 +1197,13 @@ namespace UnityEngine.Experimental.Rendering.HDPipeline
                 float maxBlendDist = Mathf.Min(probe.bounds.extents.x, Mathf.Min(probe.bounds.extents.y, probe.bounds.extents.z));
                 float blendDistance = Mathf.Min(maxBlendDist, probe.blendDistance);
                 envLightData.innerDistance = probe.bounds.extents - new Vector3(blendDistance, blendDistance, blendDistance);
-
-                envLightData.envIndex = m_CubeReflTexArray.FetchSlice(probe.texture);
-
+                envLightData.envIndex = envIndex;
                 envLightData.offsetLS = probe.center; // center is misnamed, it is the offset (in local space) from center of the bounding box to the cubemap capture point
                 envLightData.blendDistance = blendDistance;
 
                 m_lightList.envLights.Add(envLightData);
+
+                return true;
             }
 
             public void GetEnvLightVolumeDataAndBound(VisibleReflectionProbe probe, LightVolumeType lightVolumeType, Matrix4x4 worldToView)
@@ -1270,8 +1284,11 @@ namespace UnityEngine.Experimental.Rendering.HDPipeline
             }
 
             // Return true if BakedShadowMask are enabled
-            public bool PrepareLightsForGPU(ShadowSettings shadowSettings, CullResults cullResults, Camera camera)
+            public bool PrepareLightsForGPU(CommandBuffer cmd, ShadowSettings shadowSettings, CullResults cullResults, Camera camera)
             {
+                using (new ProfilingSample(cmd, "Prepare Lights For GPU"))
+            {
+
                 // If any light require it, we need to enabled bake shadow mask feature
                 m_enableBakeShadowMask = false;
 
@@ -1315,11 +1332,11 @@ namespace UnityEngine.Experimental.Rendering.HDPipeline
                         }
                     }
 
-                    float oldSpecularGlobalDimmer = m_TileSettings.specularGlobalDimmer;
+                    float oldSpecularGlobalDimmer = m_LightingSettings.specularGlobalDimmer;
                     // Change some parameters in case of "special" rendering (can be preview, reflection, etc.)
                     if (camera.cameraType == CameraType.Reflection)
                     {
-                        m_TileSettings.specularGlobalDimmer = 0.0f;
+                        m_LightingSettings.specularGlobalDimmer = 0.0f;
                     }
 
                     // 1. Count the number of lights and sort all lights by category, type and volume - This is required for the fptl/cluster shader code
@@ -1465,7 +1482,7 @@ namespace UnityEngine.Experimental.Rendering.HDPipeline
                         // Directional rendering side, it is separated as it is always visible so no volume to handle here
                         if (gpuLightType == GPULightType.Directional)
                         {
-                            if (GetDirectionalLightData(shadowSettings, gpuLightType, light, additionalLightData, additionalShadowData, lightIndex))
+                            if (GetDirectionalLightData(cmd, shadowSettings, gpuLightType, light, additionalLightData, additionalShadowData, lightIndex))
                             {
                                 directionalLightcount++;
 
@@ -1484,7 +1501,7 @@ namespace UnityEngine.Experimental.Rendering.HDPipeline
                         }
 
                         // Punctual, area, projector lights - the rendering side.
-                        if (GetLightData(shadowSettings, camera, gpuLightType, light, additionalLightData, additionalShadowData, lightIndex))
+                        if (GetLightData(cmd, shadowSettings, camera, gpuLightType, light, additionalLightData, additionalShadowData, lightIndex))
                         {
                             switch (lightCategory)
                             {
@@ -1571,8 +1588,8 @@ namespace UnityEngine.Experimental.Rendering.HDPipeline
 
                         VisibleReflectionProbe probe = cullResults.visibleReflectionProbes[probeIndex];
 
-                        GetEnvLightData(probe);
-
+                        if (GetEnvLightData(cmd, camera, probe))
+                        {
                         GetEnvLightVolumeDataAndBound(probe, lightVolumeType, worldToView);
 
                         // We make the light position camera-relative as late as possible in order
@@ -1587,11 +1604,10 @@ namespace UnityEngine.Experimental.Rendering.HDPipeline
                         }
                     }
 
-                    // Sanity check
-                    Debug.Assert(m_lightList.envLights.Count == envLightCount);
+                    }
 
                     // Restore values after "special rendering"
-                    m_TileSettings.specularGlobalDimmer = oldSpecularGlobalDimmer;
+                    m_LightingSettings.specularGlobalDimmer = oldSpecularGlobalDimmer;
                 }
 
                 m_lightCount = m_lightList.lights.Count + m_lightList.envLights.Count;
@@ -1603,6 +1619,7 @@ namespace UnityEngine.Experimental.Rendering.HDPipeline
                 m_maxShadowDistance = shadowSettings.maxShadowDistance;
 
                 return m_enableBakeShadowMask;
+            }
             }
 
             void VoxelLightListGeneration(CommandBuffer cmd, Camera camera, Matrix4x4 projscr, Matrix4x4 invProjscr, RenderTargetIdentifier cameraDepthBufferRT)
@@ -1720,9 +1737,10 @@ namespace UnityEngine.Experimental.Rendering.HDPipeline
                 var numTilesX = GetNumTileFtplX(camera);
                 var numTilesY = GetNumTileFtplY(camera);
                 var numTiles = numTilesX * numTilesY;
-                bool enableFeatureVariants = GetFeatureVariantsEnabled(m_TileSettings);
+                bool enableFeatureVariants = GetFeatureVariantsEnabled();
 
-                if (usingFptl)       // optimized for opaques only
+                // optimized for opaques only
+                if (m_isFptlEnabled)
                 {
                     cmd.SetComputeIntParam(buildPerTileLightListShader, HDShaderIDs.g_isOrthographic, isOrthographic ? 1 : 0);
                     cmd.SetComputeIntParams(buildPerTileLightListShader, HDShaderIDs.g_viDimensions, w, h);
@@ -1762,10 +1780,8 @@ namespace UnityEngine.Experimental.Rendering.HDPipeline
                     cmd.DispatchCompute(buildPerTileLightListShader, s_GenListPerTileKernel, numTilesX, numTilesY, 1);
                 }
 
-                if (m_TileSettings.enableClustered)        // works for transparencies too.
-                {
+                // Cluster
                     VoxelLightListGeneration(cmd, camera, projscr, invProjscr, cameraDepthBufferRT);
-                }
 
                 if (enableFeatureVariants)
                 {
@@ -1830,7 +1846,7 @@ namespace UnityEngine.Experimental.Rendering.HDPipeline
 
                     cmd.SetGlobalTexture(HDShaderIDs._CookieTextures, m_CookieTexArray.GetTexCache());
                     cmd.SetGlobalTexture(HDShaderIDs._CookieCubeTextures, m_CubeCookieTexArray.GetTexCache());
-                    cmd.SetGlobalTexture(HDShaderIDs._EnvTextures, m_CubeReflTexArray.GetTexCache());
+                    cmd.SetGlobalTexture(HDShaderIDs._EnvTextures, m_ReflectionProbeCache.GetTexCache());
 
                     cmd.SetGlobalBuffer(HDShaderIDs._DirectionalLightDatas, s_DirectionalLightDatas);
                     cmd.SetGlobalInt(HDShaderIDs._DirectionalLightCount, m_lightList.directionalLights.Count);
@@ -1848,11 +1864,11 @@ namespace UnityEngine.Experimental.Rendering.HDPipeline
                     cmd.SetGlobalInt(HDShaderIDs._NumTileClusteredX, GetNumTileClusteredX(camera));
                     cmd.SetGlobalInt(HDShaderIDs._NumTileClusteredY, GetNumTileClusteredY(camera));
 
-                    if (m_TileSettings.enableBigTilePrepass)
+                if (m_TileSettings.enableBigTilePrepass)
                         cmd.SetGlobalBuffer(HDShaderIDs.g_vBigTileLightList, s_BigTileLightList);
 
-                    if (m_TileSettings.enableClustered)
-                    {
+                    // Cluster
+               {
                         cmd.SetGlobalFloat(HDShaderIDs.g_fClustScale, m_ClustScale);
                         cmd.SetGlobalFloat(HDShaderIDs.g_fClustBase, k_ClustLogBase);
                         cmd.SetGlobalFloat(HDShaderIDs.g_fNearPlane, camera.nearClipPlane);
@@ -1861,11 +1877,11 @@ namespace UnityEngine.Experimental.Rendering.HDPipeline
                         cmd.SetGlobalInt(HDShaderIDs.g_isLogBaseBufferEnabled, k_UseDepthBuffer ? 1 : 0);
 
                         cmd.SetGlobalBuffer(HDShaderIDs.g_vLayeredOffsetsBuffer, s_PerVoxelOffset);
-                        if (k_UseDepthBuffer)
-                        {
+                    if (k_UseDepthBuffer)
+                    {
                             cmd.SetGlobalBuffer(HDShaderIDs.g_logBaseBuffer, s_PerTileLogBaseTweak);
-                        }
-                    }
+                }
+            }
                 }
             }
 
@@ -1883,65 +1899,6 @@ namespace UnityEngine.Experimental.Rendering.HDPipeline
             {
                 // kick off the shadow jobs here
                 m_ShadowMgr.RenderShadows(m_FrameId, renderContext, cmd, cullResults, cullResults.visibleLights);
-            }
-
-            public void RenderLightingDebug(HDCamera hdCamera, CommandBuffer cmd, RenderTargetIdentifier colorBuffer, DebugDisplaySettings debugDisplaySettings)
-            {
-                LightingDebugSettings lightingDebug = debugDisplaySettings.lightingDebugSettings;
-                if (lightingDebug.tileDebugByCategory == TileSettings.TileDebug.None)
-                    return;
-
-                using (new ProfilingSample(cmd, "Tiled Lighting Debug", HDRenderPipeline.GetSampler(CustomSamplerId.TPTiledLightingDebug)))
-                {
-                    bool bUseClusteredForDeferred = !usingFptl;
-
-                    int w = hdCamera.camera.pixelWidth;
-                    int h = hdCamera.camera.pixelHeight;
-                    int numTilesX = (w + 15) / 16;
-                    int numTilesY = (h + 15) / 16;
-                    int numTiles = numTilesX * numTilesY;
-
-                    Vector2 mousePixelCoord = Input.mousePosition;
-    #if UNITY_EDITOR
-                    if (!UnityEditor.EditorApplication.isPlayingOrWillChangePlaymode)
-                    {
-                        mousePixelCoord = m_mousePosition;
-                        mousePixelCoord.y = (hdCamera.screenSize.y - 1.0f) - mousePixelCoord.y;
-                    }
-    #endif
-
-                    // Debug tiles
-                    if (lightingDebug.tileDebugByCategory == TileSettings.TileDebug.FeatureVariants)
-                    {
-                        if (GetFeatureVariantsEnabled(m_TileSettings))
-                        {
-                            // featureVariants
-                            m_DebugViewTilesMaterial.SetInt(HDShaderIDs._NumTiles, numTiles);
-                            m_DebugViewTilesMaterial.SetInt(HDShaderIDs._ViewTilesFlags, (int)lightingDebug.tileDebugByCategory);
-                            m_DebugViewTilesMaterial.SetVector(HDShaderIDs._MousePixelCoord, mousePixelCoord);
-                            m_DebugViewTilesMaterial.SetBuffer(HDShaderIDs.g_TileList, s_TileList);
-                            m_DebugViewTilesMaterial.SetBuffer(HDShaderIDs.g_DispatchIndirectBuffer, s_DispatchIndirectBuffer);
-                            m_DebugViewTilesMaterial.EnableKeyword(bUseClusteredForDeferred ? "USE_CLUSTERED_LIGHTLIST" : "USE_FPTL_LIGHTLIST");
-                            m_DebugViewTilesMaterial.DisableKeyword(!bUseClusteredForDeferred ? "USE_CLUSTERED_LIGHTLIST" : "USE_FPTL_LIGHTLIST");
-                            m_DebugViewTilesMaterial.DisableKeyword("SHOW_LIGHT_CATEGORIES");
-                            m_DebugViewTilesMaterial.EnableKeyword("SHOW_FEATURE_VARIANTS");
-                            cmd.SetRenderTarget(colorBuffer);
-                            cmd.DrawProcedural(Matrix4x4.identity, m_DebugViewTilesMaterial, 0, MeshTopology.Triangles, numTiles * 6);
-                        }
-                    }
-                    else if (lightingDebug.tileDebugByCategory != TileSettings.TileDebug.None)
-                    {
-                        // lightCategories
-                        m_DebugViewTilesMaterial.SetInt(HDShaderIDs._ViewTilesFlags, (int)lightingDebug.tileDebugByCategory);
-                        m_DebugViewTilesMaterial.SetVector(HDShaderIDs._MousePixelCoord, mousePixelCoord);
-                        m_DebugViewTilesMaterial.EnableKeyword(bUseClusteredForDeferred ? "USE_CLUSTERED_LIGHTLIST" : "USE_FPTL_LIGHTLIST");
-                        m_DebugViewTilesMaterial.DisableKeyword(!bUseClusteredForDeferred ? "USE_CLUSTERED_LIGHTLIST" : "USE_FPTL_LIGHTLIST");
-                        m_DebugViewTilesMaterial.EnableKeyword("SHOW_LIGHT_CATEGORIES");
-                        m_DebugViewTilesMaterial.DisableKeyword("SHOW_FEATURE_VARIANTS");
-
-                        CoreUtils.DrawFullScreen(cmd, m_DebugViewTilesMaterial, 0, colorBuffer);
-                    }
-                }
             }
 
             public struct LightingPassOptions
@@ -1975,8 +1932,7 @@ namespace UnityEngine.Experimental.Rendering.HDPipeline
                                                 RenderTargetIdentifier[] colorBuffers, RenderTargetIdentifier depthStencilBuffer, RenderTargetIdentifier depthTexture,
                                                 LightingPassOptions options)
             {
-                var bUseClusteredForDeferred = !usingFptl;
-                cmd.SetGlobalBuffer(HDShaderIDs.g_vLightListGlobal, bUseClusteredForDeferred ? s_PerVoxelLightLists : s_LightList);
+                cmd.SetGlobalBuffer(HDShaderIDs.g_vLightListGlobal, s_LightList);
 
                 if (m_TileSettings.enableTileAndCluster && m_TileSettings.enableComputeLightEvaluation && options.outputSplitLighting)
                 {
@@ -2011,7 +1967,7 @@ namespace UnityEngine.Experimental.Rendering.HDPipeline
                         int numTilesY = (h + 15) / 16;
                         int numTiles = numTilesX * numTilesY;
 
-                        bool enableFeatureVariants = GetFeatureVariantsEnabled(m_TileSettings) && !debugDisplaySettings.IsDebugDisplayEnabled();
+                        bool enableFeatureVariants = GetFeatureVariantsEnabled() && !debugDisplaySettings.IsDebugDisplayEnabled();
 
                         int numVariants = 1;
                         if (enableFeatureVariants)
@@ -2023,8 +1979,6 @@ namespace UnityEngine.Experimental.Rendering.HDPipeline
 
                             if (enableFeatureVariants)
                             {
-                                // Tag: SUPPORT_COMPUTE_CLUSTER_OPAQUE - Update the code with following comment this if you want to do cluster opaque with compute shader (by default we support only fptl on opaque)
-                                // kernel = usingFptl ? s_shadeOpaqueIndirectFptlKernels[variant] : s_shadeOpaqueIndirectClusteredKernels[variant];
                                 if (m_enableBakeShadowMask)
                                     kernel = s_shadeOpaqueIndirectShadowMaskFptlKernels[variant];
                                 else
@@ -2034,17 +1988,11 @@ namespace UnityEngine.Experimental.Rendering.HDPipeline
                             {
                                 if (m_enableBakeShadowMask)
                                 {
-                                    if (debugDisplaySettings.IsDebugDisplayEnabled())
-                                        kernel = usingFptl ? s_shadeOpaqueDirectShadowMaskFptlDebugDisplayKernel : s_shadeOpaqueDirectShadowMaskClusteredDebugDisplayKernel;
-                                    else
-                                        kernel = usingFptl ? s_shadeOpaqueDirectShadowMaskFptlKernel : s_shadeOpaqueDirectShadowMaskClusteredKernel;
+                                    kernel = debugDisplaySettings.IsDebugDisplayEnabled() ? s_shadeOpaqueDirectShadowMaskFptlDebugDisplayKernel : s_shadeOpaqueDirectShadowMaskFptlKernel;
                                 }
                                 else
                                 {
-                                    if (debugDisplaySettings.IsDebugDisplayEnabled())
-                                        kernel = usingFptl ? s_shadeOpaqueDirectFptlDebugDisplayKernel : s_shadeOpaqueDirectClusteredDebugDisplayKernel;
-                                    else
-                                        kernel = usingFptl ? s_shadeOpaqueDirectFptlKernel : s_shadeOpaqueDirectClusteredKernel;
+                                    kernel = debugDisplaySettings.IsDebugDisplayEnabled() ? s_shadeOpaqueDirectFptlDebugDisplayKernel : s_shadeOpaqueDirectFptlKernel;
                                 }
                             }
 
@@ -2058,7 +2006,7 @@ namespace UnityEngine.Experimental.Rendering.HDPipeline
                             cmd.SetComputeTextureParam(deferredComputeShader, kernel, HDShaderIDs.diffuseLightingUAV,  colorBuffers[1]);
 
                             // TODO: Check if we can remove this, when I test I can't
-                            cmd.SetComputeTextureParam(deferredComputeShader, kernel, HDShaderIDs._SkyTexture, skyTexture);
+                            cmd.SetComputeTextureParam(deferredComputeShader, kernel, HDShaderIDs._SkyTexture, skyTexture ? skyTexture : m_DefaultTextureCube);
                             cmd.SetComputeFloatParam(deferredComputeShader, HDShaderIDs._SkyTextureMipCount, skyTextureMipCount);
 
                             // always do deferred lighting in blocks of 16x16 (not same as tiled light size)
@@ -2077,12 +2025,12 @@ namespace UnityEngine.Experimental.Rendering.HDPipeline
                     }
                     else // Pixel shader evaluation
                     {
-                        // OUTPUT_SPLIT_LIGHTING - LIGHTLOOP_TILE_PASS - SHADOWS_SHADOWMASK - USE_FPTL_LIGHTLIST/USE_CLUSTERED_LIGHTLIST - DEBUG_DISPLAY
-                        Material currentLightingMaterial = m_lightingMaterial[options.outputSplitLighting ? 1 : 0,
+                        int index = GetDeferredLightingMaterialIndex(   options.outputSplitLighting ? 1 : 0,
                                                                                 m_TileSettings.enableTileAndCluster ? 1 : 0,
                                                                                 m_enableBakeShadowMask ? 1 : 0,
-                                                                                bUseClusteredForDeferred ? 1 : 0,
-                                                                                debugDisplaySettings.IsDebugDisplayEnabled() ? 1 : 0];
+                                                                        debugDisplaySettings.IsDebugDisplayEnabled() ? 1 : 0);
+
+                        Material currentLightingMaterial = m_deferredLightingMaterial[index];
 
                         if (options.outputSplitLighting)
                         {
@@ -2125,22 +2073,80 @@ namespace UnityEngine.Experimental.Rendering.HDPipeline
                 else
                 {
                     // Only opaques can use FPTL, transparent must use clustered!
-                    bool useFptl = renderOpaque && usingFptl;
+                    bool useFptl = renderOpaque && m_isFptlEnabledForForwardOpaque;
 
                     using (new ProfilingSample(cmd, useFptl ? "Forward Tiled pass" : "Forward Clustered pass", HDRenderPipeline.GetSampler(CustomSamplerId.TPForwardTiledClusterpass)))
                     {
                         // say that we want to use tile of single loop
                         cmd.EnableShaderKeyword("LIGHTLOOP_TILE_PASS");
                         cmd.DisableShaderKeyword("LIGHTLOOP_SINGLE_PASS");
-                        cmd.SetGlobalFloat(HDShaderIDs._UseTileLightList, useFptl ? 1 : 0);      // leaving this as a dynamic toggle for now for forward opaques to keep shader variants down.
+                        CoreUtils.SetKeyword(cmd, "USE_FPTL_LIGHTLIST", useFptl);
+                        CoreUtils.SetKeyword(cmd, "USE_CLUSTERED_LIGHTLIST", !useFptl);
                         cmd.SetGlobalBuffer(HDShaderIDs.g_vLightListGlobal, useFptl ? s_LightList : s_PerVoxelLightLists);
                     }
                 }
             }
 
-            public void RenderDebugOverlay(Camera camera, CommandBuffer cmd, DebugDisplaySettings debugDisplaySettings, ref float x, ref float y, float overlaySize, float width)
+            public void RenderDebugOverlay(HDCamera hdCamera, CommandBuffer cmd, DebugDisplaySettings debugDisplaySettings, ref float x, ref float y, float overlaySize, float width)
             {
                 LightingDebugSettings lightingDebug = debugDisplaySettings.lightingDebugSettings;
+
+                using (new ProfilingSample(cmd, "Tiled/cluster Lighting Debug", HDRenderPipeline.GetSampler(CustomSamplerId.TPTiledLightingDebug)))
+                {
+                    if (lightingDebug.tileClusterDebug != TileSettings.TileClusterDebug.None)
+                    {
+
+                        int w = hdCamera.camera.pixelWidth;
+                        int h = hdCamera.camera.pixelHeight;
+                        int numTilesX = (w + 15) / 16;
+                        int numTilesY = (h + 15) / 16;
+                        int numTiles = numTilesX * numTilesY;
+
+                        Vector2 mousePixelCoord = Input.mousePosition;
+#if UNITY_EDITOR
+                        if (!UnityEditor.EditorApplication.isPlayingOrWillChangePlaymode)
+                        {
+                            mousePixelCoord = m_mousePosition;
+                            mousePixelCoord.y = (hdCamera.screenSize.y - 1.0f) - mousePixelCoord.y;
+                        }
+#endif
+
+                        // Debug tiles
+                        if (lightingDebug.tileClusterDebug == TileSettings.TileClusterDebug.FeatureVariants)
+                        {
+                            if (GetFeatureVariantsEnabled())
+                            {
+                                // featureVariants
+                                m_DebugViewTilesMaterial.SetInt(HDShaderIDs._NumTiles, numTiles);
+                                m_DebugViewTilesMaterial.SetInt(HDShaderIDs._ViewTilesFlags, (int)lightingDebug.tileClusterDebugByCategory);
+                                m_DebugViewTilesMaterial.SetVector(HDShaderIDs._MousePixelCoord, mousePixelCoord);
+                                m_DebugViewTilesMaterial.SetBuffer(HDShaderIDs.g_TileList, s_TileList);
+                                m_DebugViewTilesMaterial.SetBuffer(HDShaderIDs.g_DispatchIndirectBuffer, s_DispatchIndirectBuffer);
+                                m_DebugViewTilesMaterial.EnableKeyword("USE_FPTL_LIGHTLIST");
+                                m_DebugViewTilesMaterial.DisableKeyword("USE_CLUSTERED_LIGHTLIST");
+                                m_DebugViewTilesMaterial.DisableKeyword("SHOW_LIGHT_CATEGORIES");
+                                m_DebugViewTilesMaterial.EnableKeyword("SHOW_FEATURE_VARIANTS");
+                                cmd.DrawProcedural(Matrix4x4.identity, m_DebugViewTilesMaterial, 0, MeshTopology.Triangles, numTiles * 6);
+                            }
+                        }
+                        else // tile or cluster
+                        {
+                            bool bUseClustered = lightingDebug.tileClusterDebug == TileSettings.TileClusterDebug.Cluster;
+
+                            // lightCategories
+                            m_DebugViewTilesMaterial.SetInt(HDShaderIDs._ViewTilesFlags, (int)lightingDebug.tileClusterDebugByCategory);
+                            m_DebugViewTilesMaterial.SetVector(HDShaderIDs._MousePixelCoord, mousePixelCoord);
+                            m_DebugViewTilesMaterial.SetBuffer(HDShaderIDs.g_vLightListGlobal, bUseClustered ? s_PerVoxelLightLists : s_LightList);
+                            m_DebugViewTilesMaterial.EnableKeyword(bUseClustered ? "USE_CLUSTERED_LIGHTLIST" : "USE_FPTL_LIGHTLIST");
+                            m_DebugViewTilesMaterial.DisableKeyword(!bUseClustered ? "USE_CLUSTERED_LIGHTLIST" : "USE_FPTL_LIGHTLIST");
+                            m_DebugViewTilesMaterial.EnableKeyword("SHOW_LIGHT_CATEGORIES");
+                            m_DebugViewTilesMaterial.DisableKeyword("SHOW_FEATURE_VARIANTS");
+
+                            CoreUtils.DrawFullScreen(cmd, m_DebugViewTilesMaterial, 0);
+                        }
+                    }
+                }
+ 
                 using (new ProfilingSample(cmd, "Display Shadows", HDRenderPipeline.GetSampler(CustomSamplerId.TPDisplayShadows)))
                 {
                     if (lightingDebug.shadowDebugMode == ShadowMapDebugMode.VisualizeShadowMap)
@@ -2169,14 +2175,14 @@ namespace UnityEngine.Experimental.Rendering.HDPipeline
                             for (uint i = 0; i < faceCount; ++i)
                             {
                                 m_ShadowMgr.DisplayShadow(cmd, index, i, x, y, overlaySize, overlaySize, lightingDebug.shadowMinValue, lightingDebug.shadowMaxValue);
-                                HDUtils.NextOverlayCoord(ref x, ref y, overlaySize, overlaySize, camera.pixelWidth);
+                                HDUtils.NextOverlayCoord(ref x, ref y, overlaySize, overlaySize, hdCamera.camera.pixelWidth);
                             }
                         }
                     }
                     else if (lightingDebug.shadowDebugMode == ShadowMapDebugMode.VisualizeAtlas)
                     {
                         m_ShadowMgr.DisplayShadowMap(cmd, lightingDebug.shadowAtlasIndex, 0, x, y, overlaySize, overlaySize, lightingDebug.shadowMinValue, lightingDebug.shadowMaxValue);
-                        HDUtils.NextOverlayCoord(ref x, ref y, overlaySize, overlaySize, camera.pixelWidth);
+                        HDUtils.NextOverlayCoord(ref x, ref y, overlaySize, overlaySize, hdCamera.camera.pixelWidth);
                     }
                 }
             }

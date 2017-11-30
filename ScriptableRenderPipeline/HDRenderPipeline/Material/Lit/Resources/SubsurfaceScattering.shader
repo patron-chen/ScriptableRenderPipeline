@@ -41,7 +41,7 @@ Shader "Hidden/HDRenderPipeline/SubsurfaceScattering"
             // Include
             //-------------------------------------------------------------------------------------
 
-            #include "../../../../Core/ShaderLibrary/Common.hlsl"
+            #include "ShaderLibrary/Common.hlsl"
             #include "../../../ShaderVariables.hlsl"
             #define UNITY_MATERIAL_LIT // Needs to be defined before including Material.hlsl
             #include "../../../Material/Material.hlsl"
@@ -55,7 +55,6 @@ Shader "Hidden/HDRenderPipeline/SubsurfaceScattering"
             float4 _HalfRcpWeightedVariances[SSS_BASIC_N_SAMPLES];           // RGB for chromatic, A for achromatic
 
             TEXTURE2D(_IrradianceSource);             // Includes transmitted light
-            DECLARE_GBUFFER_TEXTURE(_GBufferTexture); // Contains the albedo and SSS parameters
 
             //-------------------------------------------------------------------------------------
             // Implementation
@@ -80,17 +79,15 @@ Shader "Hidden/HDRenderPipeline/SubsurfaceScattering"
 
             float4 Frag(Varyings input) : SV_Target
             {
-                PositionInputs posInput = GetPositionInput(input.positionCS.xy, _ScreenSize.zw);
-
-                float3 unused;
+                PositionInputs posInput = GetPositionInput(input.positionCS.xy, _ScreenSize.zw);                
 
                 // Note: When we are in this SubsurfaceScattering shader we know that we are a SSS material. This shader is strongly coupled with the deferred Lit.shader.
                 // We can use the material classification facility to help the compiler to know we use SSS material and optimize the code (and don't require to read gbuffer with materialId).
                 uint featureFlags = MATERIALFEATUREFLAGS_LIT_SSS;
 
                 BSDFData bsdfData;
-                FETCH_GBUFFER(gbuffer, _GBufferTexture, posInput.unPositionSS);
-                DECODE_FROM_GBUFFER(gbuffer, featureFlags, bsdfData, unused);
+                float3 unused;
+                DECODE_FROM_GBUFFER(posInput.positionSS, featureFlags, bsdfData, unused);
 
                 int    profileID   = bsdfData.subsurfaceProfile;
                 float  distScale   = bsdfData.subsurfaceRadius;
@@ -98,11 +95,11 @@ Shader "Hidden/HDRenderPipeline/SubsurfaceScattering"
 
                 // Take the first (central) sample.
                 // TODO: copy its neighborhood into LDS.
-                float2 centerPosition   = posInput.unPositionSS;
+                float2 centerPosition   = posInput.positionSS;
                 float3 centerIrradiance = LOAD_TEXTURE2D(_IrradianceSource, centerPosition).rgb;
 
                 // Reconstruct the view-space position.
-                float2 centerPosSS = posInput.positionSS;
+                float2 centerPosSS = posInput.positionNDC;
                 float2 cornerPosSS = centerPosSS + 0.5 * _ScreenSize.zw;
                 float  centerDepth = LOAD_TEXTURE2D(_MainDepthTexture, centerPosition).r;
                 float3 centerPosVS = ComputeViewSpacePosition(centerPosSS, centerDepth, UNITY_MATRIX_I_P);
@@ -141,7 +138,7 @@ Shader "Hidden/HDRenderPipeline/SubsurfaceScattering"
             #endif
 
                 // Take the first (central) sample.
-                float2 samplePosition   = posInput.unPositionSS;
+                float2 samplePosition   = posInput.positionSS;
                 float3 sampleWeight     = _FilterKernelsBasic[profileID][0].rgb;
                 float3 sampleIrradiance = LOAD_TEXTURE2D(_IrradianceSource, samplePosition).rgb;
 
@@ -171,7 +168,7 @@ Shader "Hidden/HDRenderPipeline/SubsurfaceScattering"
                 [unroll]
                 for (int i = 1; i < SSS_BASIC_N_SAMPLES; i++)
                 {
-                    samplePosition   = posInput.unPositionSS + rotatedDirection * _FilterKernelsBasic[profileID][i].a;
+                    samplePosition   = posInput.positionSS + rotatedDirection * _FilterKernelsBasic[profileID][i].a;
                     sampleWeight     = _FilterKernelsBasic[profileID][i].rgb;
                     sampleIrradiance = LOAD_TEXTURE2D(_IrradianceSource, samplePosition).rgb;
 
