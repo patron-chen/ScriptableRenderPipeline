@@ -5,6 +5,7 @@ Shader "Hidden/HDRenderPipeline/DebugViewTiles"
 
         Pass
         {
+            Cull Off
             ZWrite Off
             ZTest Always
             Blend SrcAlpha OneMinusSrcAlpha
@@ -139,6 +140,7 @@ Shader "Hidden/HDRenderPipeline/DebugViewTiles"
             float4 Frag(Varyings input) : SV_Target
             {
                 // positionCS is SV_Position
+                input.positionCS.y = (_ScreenSize.y - 1.0) - input.positionCS.y;
                 PositionInputs posInput = GetPositionInput(input.positionCS.xy, _ScreenSize.zw, uint2(input.positionCS.xy) / GetTileSize());
                 float depth = LOAD_TEXTURE2D(_MainDepthTexture, posInput.positionSS).x;
                 UpdatePositionInput(depth, UNITY_MATRIX_I_VP, UNITY_MATRIX_VP, posInput);
